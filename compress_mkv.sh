@@ -53,18 +53,20 @@ if [[ ! -f $INPUT || ! $INPUT_BASENAME =~ _original\.[[:alpha:]]+$ ]]; then
 fi
 
 INPUT_SUFFIX="${INPUT_BASENAME##*.}"
-OUTPUT="${INPUT_DIRNAME}/${INPUT_BASENAME%_original.*}.${INPUT_SUFFIX}"
+OUTPUT="${INPUT_DIRNAME}/${INPUT_BASENAME%_original.*}.mp4"
 
 DEFAULT_DVD_FILTERS=(-vf "scale=${SCALE:="trunc(480*dar/2)*2:480"}:flags=lanczos,setsar=1,setfield=prog")
 DEFAULT_DVD_FORMAT_FLAGS=(-fflags +genpts -avoid_negative_ts make_zero)
 
 ff_args=(
   -i "$INPUT"
-  -map 0:v:0 -map 0:a -map 0:s?
+  -map_metadata 0 -map_chapters 0
+  -map 0:v:0 -map 0:a:0 -map -sn
   -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p
   -x264-params interlaced=0
-  -c:a copy
+  -c:a libfdk_aac -ac 2 -ab 256k
   -c:s copy
+  -movflags +faststart
 )
 
 if [[ -n "${DVD:-}" ]]; then

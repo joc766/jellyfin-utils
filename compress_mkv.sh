@@ -61,7 +61,7 @@ DEFAULT_DVD_FORMAT_FLAGS=(-fflags +genpts -avoid_negative_ts make_zero)
 ff_args=(
   -i "$INPUT"
   -map_metadata 0 -map_chapters 0
-  -map 0:v:0 -map 0:a:0 -map -sn
+  -map 0:v:0 -map 0:a:0 -sn
   -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p
   -x264-params interlaced=0
   -c:a libfdk_aac -ac 2 -ab 256k

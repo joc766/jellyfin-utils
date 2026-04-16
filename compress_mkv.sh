@@ -1,29 +1,30 @@
 #!/bin/bash
 #
 # Perform lossless H264 compression on a ripped MKV file
-# Arguments:
+# Positional Arguments:
 #   $1: An absolute path describing the location of the original MKV file.
 #   Must be named "*_original.mkv"
 # Options:
 #   -d: flag for 480p DVD files
 #   -w: flag for widescreen resolutions. Requires -d flag to have an effect
+#   -o: flag to designate a different output directory than the default (default: "$(basename "$1")"
 
 err() {
   echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*" >&2
 }
 
 usage() {
-  echo "Usage: $0 [-d] [-w] <src>"
+  echo "Usage: $0 [-d] [-w] [-o dir] <src>"
   exit 1
 }
 
 set -euo pipefail
 
-while getopts 'dw' opt; do
+while getopts 'o:dw' opt; do
   case "${opt}" in
   d) DVD='true' ;;
   w) SCALE='854:480' ;;
-  # -o) OUTPUT=$2 ;;
+  o) OUTPUT_DIR=$"${2}/" ;;
   --) break ;;
   \?) err "Unknown option: $opt" ;;
   *) break ;;
@@ -53,7 +54,16 @@ if [[ ! -f $INPUT || ! $INPUT_BASENAME =~ _original\.[[:alpha:]]+$ ]]; then
 fi
 
 INPUT_SUFFIX="${INPUT_BASENAME##*.}"
-OUTPUT="${INPUT_DIRNAME}/${INPUT_BASENAME%_original.*}.mp4"
+
+if [[ -z ${OUTPUT_DIR:-} ]]; then
+  OUTPUT_DIR="$INPUT_DIRNAME"
+elif [[ ! -d $OUTPUT_DIR ]]; then
+  err "Output Directory $OUTPUT_DIR does not exist."
+  OUTPUT_DIR="$INPUT_DIRNAME"
+  usage
+fi
+
+OUTPUT="${OUTPUT_DIR}/${INPUT_BASENAME%_original.*}.mp4"
 
 DEFAULT_DVD_FILTERS=(-vf "scale=${SCALE:="trunc(480*dar/2)*2:480"}:flags=lanczos,setsar=1,setfield=prog")
 DEFAULT_DVD_FORMAT_FLAGS=(-fflags +genpts -avoid_negative_ts make_zero)

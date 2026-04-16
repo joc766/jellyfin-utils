@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 MOVIE_ROOT="/Volumes/Sandisk/Raw Movies"
 

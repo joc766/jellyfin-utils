@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Perform lossless H264 compression on a ripped MKV file
 # Positional Arguments:

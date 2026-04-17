@@ -7,7 +7,8 @@
 # Options:
 #   -d: flag for 480p DVD files
 #   -w: flag for widescreen resolutions. Requires -d flag to have an effect
-#   -o: flag to designate a different output directory than the default (default: "$(basename "$1")"
+#   -o: flag to designate a different output directory than the default
+#   (default: "$(basename "$1")"
 
 err() {
   echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*" >&2

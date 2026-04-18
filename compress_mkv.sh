@@ -25,7 +25,7 @@ while getopts 'o:dw' opt; do
   case "${opt}" in
   d) DVD='true' ;;
   w) SCALE='854:480' ;;
-  o) OUTPUT_DIR=$"${2}/" ;;
+  o) OUTPUT_DIR="${OPTARG%/}" ;;
   --) break ;;
   \?) err "Unknown option: $opt" ;;
   *) break ;;
@@ -86,3 +86,5 @@ if [[ -n "${DVD:-}" ]]; then
 fi
 
 ffmpeg "${ff_args[@]}" "$OUTPUT"
+
+exit 0

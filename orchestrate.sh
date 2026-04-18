@@ -32,6 +32,6 @@ else
 fi
 
 echo "Syncing compressed content to server..."
-eval "$(./sync-movie-to-server.sh "$JELLYFIN_COMPRESSED_BASE")"
+./sync-movie-to-server.sh "$JELLYFIN_COMPRESSED_BASE"
 
 exit 0

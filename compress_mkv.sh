@@ -67,22 +67,22 @@ fi
 OUTPUT="${OUTPUT_DIR}/${INPUT_BASENAME%_original.*}.mp4"
 
 DEFAULT_DVD_FILTERS=(-vf "scale=${SCALE:="trunc(480*dar/2)*2:480"}:flags=lanczos,setsar=1,setfield=prog")
-DEFAULT_DVD_FORMAT_FLAGS=(-fflags +genpts -avoid_negative_ts make_zero)
 
 ff_args=(
   -i "$INPUT"
   -map_metadata 0 -map_chapters 0
   -map 0:v:0 -map 0:a:0 -sn
   -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p
+  -profile:v high -level 4.1
+  -maxrate 20M -bufsize 20M
   -x264-params interlaced=0
   -c:a libfdk_aac -ac 2 -ab 256k
-  -c:s copy
   -movflags +faststart
+  -fflags +genpts -avoid_negative_ts make_zero
 )
 
 if [[ -n "${DVD:-}" ]]; then
   ff_args+=("${DEFAULT_DVD_FILTERS[@]}")
-  ff_args+=("${DEFAULT_DVD_FORMAT_FLAGS[@]}")
 fi
 
 ffmpeg "${ff_args[@]}" "$OUTPUT"

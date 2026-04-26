@@ -27,7 +27,7 @@ if [[ $INPUT =~ /$ ]]; then
   exit 1
 fi
 
-REMOTE_DEST="banana:'/media/jellyfin/movies/'"
+REMOTE_DEST="jackoconnor@192.168.50.2:'/mnt/storage/jellyfin/movies/'"
 
 rsync -rltDvhW --delete --partial ${DRY_RUN_ARG:+$DRY_RUN_ARG} --progress --stats --exclude '.DS_Store' \
   -e "ssh -T -c aes128-gcm@openssh.com -o Compression=no -o ServerAliveInterval=30 -o ServerAliveCountMax=6" \

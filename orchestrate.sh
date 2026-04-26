@@ -25,7 +25,7 @@ echo "Reorganizing files..."
 eval "$(./organize_files.sh "$imdb_id" "$MAKEMKV_FOLDER_NAME")"
 
 echo "Compressing MKV to H264 MP4 AAC Stereo..."
-if [[ "$DVD" == "true" ]]; then
+if [[ -n "${DVD:-}" && $"$DVD" == "true" ]]; then
   eval "$(./compress_mkv.sh -d -o "$JELLYFIN_COMPRESSED_BASE" "$JELLYFIN_RAW_PATH")"
 else
   eval "$(./compress_mkv.sh -o "$JELLYFIN_COMPRESSED_BASE" "$JELLYFIN_RAW_PATH")"

@@ -23,13 +23,13 @@ if [[ ! $INPUT =~ ^/ ]]; then
 fi
 
 if [[ $INPUT =~ /$ ]]; then
-  echo "Input must not end with a slash" >&2
+  echo "Input must not end with a slash; this program is designed to copy an entire directory, not just its contents" >&2
   exit 1
 fi
 
-REMOTE_DEST="jackoconnor@192.168.50.2:'/mnt/storage/raw-movies-backup/'"
+REMOTE_DEST="jackoconnor@192.168.50.2:'/mnt/storage/jellyfin/tv/'"
 
-rsync -rltDvh --delete --partial ${DRY_RUN_ARG:+$DRY_RUN_ARG} --append --progress --stats --exclude '.DS_Store' \
+rsync -rltDvhW --delete --partial ${DRY_RUN_ARG:+$DRY_RUN_ARG} --progress --stats --exclude '.DS_Store' \
   -e "ssh -T -c aes128-gcm@openssh.com -o Compression=no -o ServerAliveInterval=30 -o ServerAliveCountMax=6" \
   --rsync-path='sudo -n rsync' \
   --chmod=Du=rwx,Dg=rx,Do=rx,Fu=rw,Fg=r,Fo=r \

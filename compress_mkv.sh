@@ -85,6 +85,6 @@ if [[ -n "${DVD:-}" ]]; then
   ff_args+=("${DEFAULT_DVD_FILTERS[@]}")
 fi
 
-ffmpeg "${ff_args[@]}" "$OUTPUT"
+ffmpeg -nostdin "${ff_args[@]}" "$OUTPUT"
 
 exit 0

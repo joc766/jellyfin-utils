@@ -9,8 +9,58 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Optional
 from dataclasses import dataclass, field
+
+
+@dataclass
+class InfoEvent:
+    raw_line: str
+
+
+@dataclass
+class DiscInfoEvent(InfoEvent):
+    key: str
+    value: str
+
+
+@dataclass
+class TitleInfoEvent(InfoEvent):
+    title_id: int
+    key: str
+    value: str
+
+
+@dataclass
+class StreamInfoEvent(InfoEvent):
+    title_id: int
+    stream_id: int
+    key: str
+    value: str
+
+
+DISC_FIELD_MAP = {1: "disc_type", 2: "disc_title"}
+
+
+TITLE_FIELD_MAP = {
+    8: "chapter_count",
+    9: "duration",
+    10: "size_human",
+    11: "size_bytes",
+    27: "title_name",
+}
+
+
+STREAM_INFO_MAP = {
+    1: "type",
+    2: "audio_type",
+    3: "audio_lang",
+    5: "format",
+    13: "bitrate",
+    19: "dimensions",
+    20: "aspect_ratio",
+    21: "framerate",
+}
 
 
 @dataclass
@@ -43,138 +93,188 @@ class MakeMKVDiscInfo:
     titles: dict[int, MakeMKVTitleInfo] = field(default_factory=dict)
 
 
-def identify_mkv_lines(line: str):
-    pass
+class MakeMKVClient:
+    def __init__(self, executable: str = "makemkvcon"):
+        self.executable = executable
+        self.raw_drive_name = None
+        self.disc_name = None
+        self.os_disc_path = None
+
+    def identify_disc_drive(self):
+        # MakeMKV info step: extract correct drive number
+        info_pattern = re.compile("^DRV:(.*)$", re.IGNORECASE)
+        info_result = subprocess.run(
+            ["makemkvcon", "info", "-r", "--cache=1", "info", "disc:9999"],
+            capture_output=True,
+            text=True,
+        )
+
+        disc_name = None
+        raw_drive_name = None
+        os_disc_path = None
+        for line in info_result.stdout.splitlines():
+            match = info_pattern.search(line)
+            if match:
+                drive_info = match.group(1)
+                raw_drive_name, _, _, _, _, disc_name, os_disc_path = drive_info.split(
+                    ","
+                )
+                disc_name = disc_name.replace('"', "")
+                os_disc_path = os_disc_path.replace('"', "")
+                if len(disc_name) > 0:
+                    raw_drive_name = "disc:" + raw_drive_name
+
+                    break
+
+        assert disc_name is not None
+        assert raw_drive_name is not None
+        assert os_disc_path is not None
+
+        self.disc_name = disc_name
+        self.raw_drive_name = raw_drive_name
+        self.os_disc_path = os_disc_path
+
+    def get_info_lines(self) -> list:
+        assert self.raw_drive_name is not None
+        result = subprocess.run(
+            ["makemkvcon", "-r", "--cache=16", "info", self.raw_drive_name],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.stdout is not None
+
+        return result.stdout.splitlines()
 
 
-def identify_disc_drive() -> Tuple[str, str, str]:
-    # MakeMKV info step: extract correct drive number
-    info_pattern = re.compile("^DRV:(.*)$", re.IGNORECASE)
-    info_result = subprocess.run(
-        ["makemkvcon", "info", "-r", "--cache=1", "info", "disc:9999"],
-        capture_output=True,
-        text=True,
-    )
+class MakeMKVInfoBuilder:
+    def __init__(self):
+        self.disc_info: MakeMKVDiscInfo = MakeMKVDiscInfo()
 
-    disc_name = None
-    raw_drive_name = None
-    os_disc_path = None
-    for line in info_result.stdout.splitlines():
-        match = info_pattern.search(line)
-        if match:
-            drive_info = match.group(1)
-            raw_drive_name, _, _, _, _, disc_name, os_disc_path = drive_info.split(",")
-            disc_name = disc_name.replace('"', "")
-            os_disc_path = os_disc_path.replace('"', "")
-            if len(disc_name) > 0:
-                raw_drive_name = "disc:" + raw_drive_name
+    def apply(self, event: InfoEvent):
+        match event:
+            case DiscInfoEvent():
+                self.apply_disc_info(event)
+            case TitleInfoEvent():
+                self.apply_title_info(event)
+            case StreamInfoEvent():
+                self.apply_stream_info(event)
 
-                break
+    def apply_disc_info(self, event: DiscInfoEvent):
+        match event.key:
+            case "disc_type":
+                if event.value == "DVD disc":
+                    disc_type = "DVD"
+                else:
+                    disc_type = "BD"
+                self.disc_info.disc_type = disc_type
+            case "disc_title":
+                self.disc_info.disc_title = event.value
 
-    assert disc_name is not None
-    assert raw_drive_name is not None
-    assert os_disc_path is not None
+    def get_title(self, title_id: int) -> MakeMKVTitleInfo:
+        if title_id not in self.disc_info.titles.keys():
+            self.disc_info.titles[title_id] = MakeMKVTitleInfo(title_id=title_id)
+        return self.disc_info.titles[title_id]
 
-    return raw_drive_name, disc_name, os_disc_path
+    def apply_title_info(self, event: TitleInfoEvent):
+        title = self.get_title(event.title_id)
+        match event.key:
+            case "chapter_count":
+                title.chapter_count = int(event.value)
+            case "duration":
+                title.duration = event.value
+            case "size_human":
+                title.size_human = event.value
+            case "size_bytes":
+                title.size_bytes = int(event.value)
+            case "title_name":
+                title.title_name = event.value
+
+    def get_stream(self, title_id: int, stream_id: int) -> MakeMKVStreamInfo:
+        title = self.get_title(title_id)
+        if stream_id not in title.streams.keys():
+            title.streams[stream_id] = MakeMKVStreamInfo()
+        return title.streams[stream_id]
+
+    def apply_stream_info(self, event: StreamInfoEvent):
+        stream = self.get_stream(event.title_id, event.stream_id)
+        match event.key:
+            case "type":
+                stream.type = event.value
+            case "audio_type":
+                stream.audio_type = event.value
+            case "audio_lang":
+                stream.audio_lang = event.value
+            case "format":
+                stream.format = event.value
+            case "bitrate":
+                stream.bitrate = event.value
+            case "dimensions":
+                stream.dimensions = event.value
+            case "aspect_ratio":
+                stream.aspect_ratio = event.value
+            case "framerate":
+                stream.framerate = event.value
+
+    def build(self) -> MakeMKVDiscInfo:
+        return self.disc_info
 
 
-# TODO: refactor function to reduce cyclomatic complexity
-def extract_disc_info(raw_drive_name: str) -> MakeMKVDiscInfo:
-    """
-    Extract disc info using `makemkvcon -r --cache=16 info [raw_drive_name].
+class MKVInfoParser:
+    def __init__(self):
+        self.disc_info_pattern = re.compile('^CINFO:(\\d+),(\\d+),"([^"]+)"$')
+        self.title_info_pattern = re.compile('^TINFO:(\\d+),(\\d+),(\\d+),"([^"]+)"$')
+        self.stream_info_pattern = re.compile(
+            '^SINFO:(\\d+),(\\d+),(\\d+),(\\d+),"([^"]+)"$'
+        )
 
-    Parses information into a MakeMKVInfo object.
-    """
+        self.builder = MakeMKVInfoBuilder()
 
-    result = subprocess.run(
-        ["makemkvcon", "-r", "--cache=16", "info", raw_drive_name],
-        capture_output=True,
-        text=True,
-    )
+    def parse(self, lines: list) -> MakeMKVDiscInfo:
+        for line in lines:
+            if line[0:6] in ("CINFO:", "TINFO:", "SINFO:"):
+                event = self.parse_line(line)
+                if event is not None:
+                    self.builder.apply(event)
 
-    assert result.stdout is not None
+        return self.builder.build()
 
-    disc_title_pattern = re.compile('^CINFO:(\\d+),(\\d+),"([^"]+)"$')
-    title_info_pattern = re.compile('^TINFO:(\\d+),(\\d+),(\\d+),"([^"]+)"$')
-    stream_info_pattern = re.compile('^SINFO:(\\d+),(\\d+),(\\d+),(\\d+),"([^"]+)"$')
+    def parse_line(self, line: str) -> InfoEvent | None:
+        if disc_info_match := self.disc_info_pattern.match(line):
+            event_code = int(disc_info_match.group(1))
+            # ignore lines that we do not care about
+            if event_code in DISC_FIELD_MAP.keys():
+                disc_info_event = DiscInfoEvent(
+                    key=DISC_FIELD_MAP[event_code],
+                    value=disc_info_match.group(3),
+                    raw_line=line,
+                )
+                return disc_info_event
 
-    disc_info: MakeMKVDiscInfo = MakeMKVDiscInfo()
-    curr_title: MakeMKVTitleInfo = MakeMKVTitleInfo(title_id=0)
-    curr_title_num: int = 0
-    curr_stream: MakeMKVStreamInfo = MakeMKVStreamInfo()
-    curr_stream_num: int = 0
+        elif title_info_match := self.title_info_pattern.match(line):
+            event_code = int(title_info_match.group(2))
+            # ignore lines that we do not care about
+            if event_code in TITLE_FIELD_MAP.keys():
+                title_info_event = TitleInfoEvent(
+                    title_id=int(title_info_match.group(1)),
+                    key=TITLE_FIELD_MAP[event_code],
+                    value=title_info_match.group(4),
+                    raw_line=line,
+                )
+                return title_info_event
 
-    for line in result.stdout.splitlines():
-        if disc_title_match := disc_title_pattern.match(line):
-            info_code = int(disc_title_match.group(1))
-            info_value = disc_title_match.group(3)
-            if info_code == 2:
-                disc_info.disc_title = str(info_value)
-            elif info_code == 1:
-                if info_value == "DVD disc":
-                    disc_info.disc_type = "DVD"
-                elif info_value == "Blu-ray disc":
-                    disc_info.disc_type = "BD"
-
-        elif title_info_match := title_info_pattern.match(line):
-            title_num = int(title_info_match.group(1))
-            info_code = int(title_info_match.group(2))
-            info_value = title_info_match.group(4)
-
-            if title_num != curr_title_num:
-                # Add current title info to disc_info.titles and reset stream
-                curr_title.streams[curr_stream_num] = curr_stream
-                disc_info.titles[curr_title_num] = curr_title
-                curr_title = MakeMKVTitleInfo(title_id=title_num)
-                curr_title_num = title_num
-                curr_stream_num = 0
-                curr_stream = MakeMKVStreamInfo()
-
-            if info_code == 8:
-                curr_title.chapter_count = int(info_value)
-            elif info_code == 9:
-                curr_title.duration = str(info_value)
-            elif info_code == 10:
-                curr_title.size_human = str(info_value)
-            elif info_code == 11:
-                curr_title.size_bytes = int(info_value)
-            elif info_code == 27:
-                curr_title.title_name = str(info_value)
-
-        elif stream_info_match := stream_info_pattern.match(line):
-            title_num = int(stream_info_match.group(1))
-            stream_num = int(stream_info_match.group(2))
-            stream_info_code = int(stream_info_match.group(3))
-            stream_info_value = stream_info_match.group(5)
-
-            if stream_num != curr_stream_num:
-                # Add current stream to title_info.streams
-                curr_title.streams[curr_stream_num] = curr_stream
-                curr_stream_num = stream_num
-                curr_stream = MakeMKVStreamInfo()
-
-            if stream_info_code == 1:
-                curr_stream.type = str(stream_info_value)
-            elif stream_info_code == 5:
-                curr_stream.format = str(stream_info_value)
-            elif stream_info_code == 13:
-                curr_stream.bitrate = str(stream_info_value)
-            elif stream_info_code == 19:
-                curr_stream.dimensions = str(stream_info_value)
-            elif stream_info_code == 20:
-                curr_stream.aspect_ratio = str(stream_info_value)
-            elif stream_info_code == 21:
-                curr_stream.framerate = str(stream_info_value)
-            elif stream_info_code == 2:
-                curr_stream.audio_type = str(stream_info_value)
-            elif stream_info_code == 3:
-                curr_stream.audio_lang = str(stream_info_value)
-
-    curr_title.streams[curr_stream_num] = curr_stream
-    disc_info.titles[curr_title_num] = curr_title
-
-    assert disc_info is not None
-    return disc_info
+        elif stream_info_match := self.stream_info_pattern.match(line):
+            event_code = int(stream_info_match.group(3))
+            # ignore lines that we do not care about
+            if event_code in STREAM_INFO_MAP.keys():
+                stream_info_event = StreamInfoEvent(
+                    title_id=int(stream_info_match.group(1)),
+                    stream_id=int(stream_info_match.group(2)),
+                    key=STREAM_INFO_MAP[event_code],
+                    value=stream_info_match.group(5),
+                    raw_line=line,
+                )
+                return stream_info_event
 
 
 def check_existing_mkvs(output_path):
@@ -198,8 +298,12 @@ def check_existing_mkvs(output_path):
 # TODO: option to rip largest title, interactive mode, or all content on disc
 def rip_disk(verbose: bool, output_base: Path):
 
-    raw_drive_name, disc_name, _ = identify_disc_drive()
-    disc_info = extract_disc_info(raw_drive_name)
+    mkv_client = MakeMKVClient()
+
+    mkv_client.identify_disc_drive()
+    lines = mkv_client.get_info_lines()
+
+    disc_info = MKVInfoParser().parse(lines)
 
     # MakeMKV mkv rip step: track progress
     output_path = output_base / disc_name

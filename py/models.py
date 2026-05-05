@@ -7,6 +7,20 @@ class InfoEvent:
     raw_line: str
 
 
+# Drive scan messages
+# DRV:index,visible,enabled,flags,drive name,disc name
+@dataclass
+class DriveInfoEvent(InfoEvent):
+    index: int
+    drive_name: str
+    disc_name: str
+    os_path: str
+
+
+# Disc, title and stream information
+# CINFO:id,code,value
+# TINFO:id,code,value
+# SINFO:id,code,value
 @dataclass
 class DiscInfoEvent(InfoEvent):
     key: str

@@ -15,6 +15,7 @@ from rich.progress import (
 from models import ProgEvent, ProgTotalEvent, ProgCurrEvent, ProgValueEvent
 
 
+# TODO: keep some tasks in the display?
 class MakeMKVProgressTracker:
     PROG_TOTAL_PATTERN = re.compile('^PRGT:(\\d+),(\\d+),"([^"]+)"$')
     PROG_CURR_PATTERN = re.compile('^PRGC:(\\d+),(\\d+),"([^"]+)"$')
@@ -108,7 +109,7 @@ class MakeMKVProgressTracker:
                     if len(self.total_task_queue) > 0:
                         prev_task_id = self.total_task_queue.pop()
                         self.progress.update(
-                            prev_task_id, completed=65536, visible=False
+                            prev_task_id, completed=65536
                         )
                     # add new total_task
                     self.task_codes.add(event.code)
@@ -121,7 +122,7 @@ class MakeMKVProgressTracker:
                     if len(self.curr_task_queue) > 0:
                         prev_task_id = self.curr_task_queue.pop()
                         self.progress.update(
-                            prev_task_id, completed=65536, visible=False
+                            prev_task_id, completed=65536
                         )
                     # add new curr_task
                     self.task_codes.add(event.code)
@@ -134,19 +135,19 @@ class MakeMKVProgressTracker:
                     total_task_id = self.total_task_queue[0]
                     self.progress.update(total_task_id, completed=event.total)
                     if self.progress.tasks[total_task_id].finished:
-                        self.progress.update(total_task_id, visible=False)
+                        self.progress.update(total_task_id)
                         self.total_task_queue.pop()
                 if len(self.curr_task_queue) > 0:
                     curr_task_id = self.curr_task_queue[0]
                     self.progress.update(curr_task_id, completed=event.current)
                     if self.progress.tasks[curr_task_id].finished:
-                        self.progress.update(curr_task_id, visible=False)
+                        self.progress.update(curr_task_id)
                         self.curr_task_queue.pop()
 
     def complete_all(self):
         if len(self.curr_task_queue) > 0:
             curr_task_id = self.curr_task_queue.pop()
-            self.progress.update(curr_task_id, completed=65536, visible=False)
+            self.progress.update(curr_task_id, completed=65536)
         if len(self.total_task_queue) > 0:
             total_task_id = self.total_task_queue.pop()
-            self.progress.update(total_task_id, completed=65536, visible=False)
+            self.progress.update(total_task_id, completed=65536)

@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -47,11 +46,11 @@ class MakeMKVStreamInfo:
     type: str = ""
     format: str = ""
     bitrate: str = ""
-    dimensions: Optional[str] = None
-    aspect_ratio: Optional[str] = None
-    framerate: Optional[str] = None
-    audio_type: Optional[str] = None
-    audio_lang: Optional[str] = None
+    dimensions: str | None = None
+    aspect_ratio: str | None = None
+    framerate: str | None = None
+    audio_type: str | None = None
+    audio_lang: str | None = None
 
 
 @dataclass

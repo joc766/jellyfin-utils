@@ -1,14 +1,14 @@
 import re
 
 from .models import (
-    InfoEvent,
-    DriveInfoEvent,
     DiscInfoEvent,
-    TitleInfoEvent,
-    StreamInfoEvent,
+    DriveInfoEvent,
+    InfoEvent,
     MakeMKVDiscInfo,
-    MakeMKVTitleInfo,
     MakeMKVStreamInfo,
+    MakeMKVTitleInfo,
+    StreamInfoEvent,
+    TitleInfoEvent,
 )
 from .progress_tracker import MakeMKVProgressTracker
 
@@ -130,9 +130,7 @@ class MKVInfoParser:
         )
         self.disc_info_pattern = re.compile('^CINFO:(\\d+),(\\d+),"([^"]+)"$')
         self.title_info_pattern = re.compile('^TINFO:(\\d+),(\\d+),(\\d+),"([^"]+)"$')
-        self.stream_info_pattern = re.compile(
-            '^SINFO:(\\d+),(\\d+),(\\d+),(\\d+),"([^"]+)"$'
-        )
+        self.stream_info_pattern = re.compile('^SINFO:(\\d+),(\\d+),(\\d+),(\\d+),"([^"]+)"$')
         self.builder = MakeMKVInfoBuilder()
         self.progress_tracker = MakeMKVProgressTracker()
 

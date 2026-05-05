@@ -1,16 +1,11 @@
 import re
 import subprocess
 
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
+
+from progress_tracker import MakeMKVProgressTracker
 
 
 @dataclass
@@ -101,6 +96,8 @@ class MakeMKVClient:
         self.os_disc_path = None
 
     def identify_disc_drive(self):
+        # TODO: use MakeMKVProgressTracker and Popen
+
         # MakeMKV info step: extract correct drive number
         info_pattern = re.compile("^DRV:(.*)$", re.IGNORECASE)
         info_result = subprocess.run(
@@ -134,17 +131,35 @@ class MakeMKVClient:
         self.raw_drive_name = raw_drive_name
         self.os_disc_path = os_disc_path
 
-    def get_info_lines(self) -> list:
+    def get_info_lines(self):
         assert self.raw_drive_name is not None
-        result = subprocess.run(
-            ["makemkvcon", "-r", "--cache=16", "info", self.raw_drive_name],
-            capture_output=True,
+        info_proc = subprocess.Popen(
+            [
+                "makemkvcon",
+                "-r",
+                "--cache=16",
+                "info",
+                "--progress=-stdout",
+                self.raw_drive_name,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
+            bufsize=1,
         )
 
-        assert result.stdout is not None
+        assert info_proc.stdout is not None
 
-        return result.stdout.splitlines()
+        # TODO: this doesn't work! the progress tracker is taking stdout away
+        # adjust the approach to send each line to both the progress parser
+        # and the Info Parser in real-time.
+        try:
+            for line in info_proc.stdout:
+                yield line
+        finally:
+            result = info_proc.wait()
+            if result != 0:
+                raise RuntimeError(f"makemkvcon failed with exit code {result}")
 
 
 class MakeMKVInfoBuilder:
@@ -232,12 +247,15 @@ class MKVInfoParser:
 
     def parse(self, lines: list) -> MakeMKVDiscInfo:
         for line in lines:
-            if line[0:6] in ("CINFO:", "TINFO:", "SINFO:"):
-                event = self.parse_line(line)
-                if event is not None:
-                    self.builder.apply(event)
+            self.handle_line(line)
 
         return self.builder.build()
+
+    def handle_line(self, line: str):
+        if line[0:6] in ("CINFO:", "TINFO:", "SINFO:"):
+            event = self.parse_line(line)
+            if event is not None:
+                self.builder.apply(event)
 
     def parse_line(self, line: str) -> InfoEvent | None:
         if disc_info_match := self.disc_info_pattern.match(line):
@@ -276,6 +294,9 @@ class MKVInfoParser:
                 )
                 return stream_info_event
 
+    def build(self):
+        return self.builder.build()
+
 
 def check_existing_mkvs(output_path):
     # Handle existing MKVs in output path
@@ -296,84 +317,56 @@ def check_existing_mkvs(output_path):
 
 
 # TODO: option to rip largest title, interactive mode, or all content on disc
-def rip_disk(verbose: bool, output_base: Path):
+def rip_disk():
 
     mkv_client = MakeMKVClient()
 
     mkv_client.identify_disc_drive()
-    lines = mkv_client.get_info_lines()
 
-    disc_info = MKVInfoParser().parse(lines)
+    info_parser = MKVInfoParser()
+    progress_tracker = MakeMKVProgressTracker()
+    try:
+        for line in mkv_client.get_info_lines():
+            info_parser.handle_line(line)
+            progress_tracker.handle_line(line)
+    finally:
+        progress_tracker.stop_progress()
+        disc_info = info_parser.build()
+
+    return disc_info
 
     # MakeMKV mkv rip step: track progress
-    output_path = output_base / disc_name
-
-    cache_size = None
-    if disc_info.disc_type == "BD":
-        cache_size = 1024
-    elif disc_info.disc_type == "DVD":
-        cache_size = 512
-
-    assert cache_size is not None
-
-    check_existing_mkvs(output_path)
-
-    mkv_proc = subprocess.Popen(
-        [
-            "makemkvcon",
-            "mkv",
-            "-r",
-            f"--cache={cache_size}",
-            "--progress=-stdout",
-            raw_drive_name,
-            "all",
-            output_path,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
-
-    assert mkv_proc.stdout is not None
-
-    total_prog_pattern = re.compile('^PRGT:(\\d+),(\\d+),"([^"]+)"')
-    curr_prog_pattern = re.compile('^PRGC:(\\d+),(\\d+),"([^"]+)"')
-    mkv_pattern = re.compile("^PRGV:(\\d+),(\\d+),(\\d+)$")
-    total_task = None
-    curr_task = None
-    with Progress(
-        TextColumn("[bold]{task.description}"),
-        BarColumn(),
-        TextColumn("{task.percentage:>5.1f}%"),
-        TimeElapsedColumn(),
-        TimeRemainingColumn(),
-    ) as progress:
-        for line in mkv_proc.stdout:
-            line = line.rstrip("\n")
-            if verbose:
-                print(line)
-
-            if total_prog_match := total_prog_pattern.match(line):
-                message = total_prog_match.group(3)
-                if total_task is not None:
-                    progress.update(total_task, completed=65536)
-                total_task = progress.add_task(f"[green]{message}", total=65536)
-
-            elif curr_prog_match := curr_prog_pattern.match(line):
-                message = curr_prog_match.group(3)
-                if curr_task is not None:
-                    progress.update(curr_task, completed=65536, visible=False)
-                curr_task = progress.add_task(f"[blue]{message}", total=65536)
-
-            elif mkv_match := mkv_pattern.match(line):
-                curr_prog = int(mkv_match.group(1))
-                total_prog = int(mkv_match.group(2))
-                # max_value = int(mkv_match.group(3))
-
-                if curr_task is not None:
-                    progress.update(curr_task, completed=curr_prog)
-                if total_task is not None:
-                    progress.update(total_task, completed=total_prog)
-
-    return mkv_proc.wait()
+    # output_path = output_base / disc_name
+    #
+    # cache_size = None
+    # if disc_info.disc_type == "BD":
+    #     cache_size = 1024
+    # elif disc_info.disc_type == "DVD":
+    #     cache_size = 512
+    #
+    # assert cache_size is not None
+    #
+    # check_existing_mkvs(output_path)
+    #
+    # mkv_proc = subprocess.Popen(
+    #     [
+    #         "makemkvcon",
+    #         "mkv",
+    #         "-r",
+    #         f"--cache={cache_size}",
+    #         "--progress=-stdout",
+    #         raw_drive_name,
+    #         "all",
+    #         output_path,
+    #     ],
+    #     stdout=subprocess.PIPE,
+    #     stderr=subprocess.STDOUT,
+    #     text=True,
+    #     bufsize=1,
+    # )
+    #
+    # assert mkv_proc.stdout is not None
+    #
+    # MakeMKVProgressTracker(mkv_proc.stdout).track_progress()
+    #
+    # return mkv_proc.wait()

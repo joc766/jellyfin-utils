@@ -1,7 +1,7 @@
 import os
-import click
-
 from pathlib import Path
+
+import click
 from dotenv import load_dotenv
 
 from .makemkv_tool.rip_disk import rip_disk

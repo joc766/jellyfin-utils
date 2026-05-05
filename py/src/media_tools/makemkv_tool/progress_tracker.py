@@ -1,18 +1,17 @@
 import re
-
 from time import sleep
-
 from typing import IO
+
 from rich.progress import (
-    Progress,
     BarColumn,
+    Progress,
+    TaskID,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
-    TaskID,
 )
 
-from .models import ProgEvent, ProgTotalEvent, ProgCurrEvent, ProgValueEvent
+from .models import ProgCurrEvent, ProgEvent, ProgTotalEvent, ProgValueEvent
 
 
 class MakeMKVProgressTracker:
@@ -61,9 +60,7 @@ class MakeMKVProgressTracker:
 
     def track_progress(self, verbose=False, testing_mode=False):
         if self.proc is None:
-            raise Exception(
-                "track_progress cannot be called when proc is not provided."
-            )
+            raise Exception("track_progress cannot be called when proc is not provided.")
         self.start_progress()
         try:
             for line in self.proc:

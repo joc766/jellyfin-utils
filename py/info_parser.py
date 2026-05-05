@@ -2,6 +2,7 @@ import re
 
 from models import (
     InfoEvent,
+    DriveInfoEvent,
     DiscInfoEvent,
     TitleInfoEvent,
     StreamInfoEvent,
@@ -14,16 +15,22 @@ from progress_tracker import MakeMKVProgressTracker
 
 class MakeMKVInfoBuilder:
     def __init__(self):
+        self.drives: list[DriveInfoEvent] = []
         self.disc_info: MakeMKVDiscInfo = MakeMKVDiscInfo()
 
     def apply(self, event: InfoEvent):
         match event:
+            case DriveInfoEvent():
+                self.add_drive(event)
             case DiscInfoEvent():
                 self.apply_disc_info(event)
             case TitleInfoEvent():
                 self.apply_title_info(event)
             case StreamInfoEvent():
                 self.apply_stream_info(event)
+
+    def add_drive(self, event: DriveInfoEvent):
+        self.drives.append(event)
 
     def apply_disc_info(self, event: DiscInfoEvent):
         match event.key:
@@ -81,6 +88,16 @@ class MakeMKVInfoBuilder:
             case "framerate":
                 stream.framerate = event.value
 
+    def extract_active_drive(self):
+        for drive in self.drives:
+            if len(drive.disc_name) > 0:
+                return (
+                    f"disc:{drive.index}",
+                    drive.drive_name,
+                    drive.disc_name,
+                    drive.os_path,
+                )
+
     def build(self) -> MakeMKVDiscInfo:
         return self.disc_info
 
@@ -108,6 +125,9 @@ class MKVInfoParser:
     }
 
     def __init__(self):
+        self.drive_info_pattern = re.compile(
+            '^DRV:(\\d+),\\d+,\\d+,\\d+,"([^"]+)","([^"]+)","([^"]+)"$'
+        )
         self.disc_info_pattern = re.compile('^CINFO:(\\d+),(\\d+),"([^"]+)"$')
         self.title_info_pattern = re.compile('^TINFO:(\\d+),(\\d+),(\\d+),"([^"]+)"$')
         self.stream_info_pattern = re.compile(
@@ -126,14 +146,22 @@ class MKVInfoParser:
     def handle_line(self, line: str):
         self.progress_tracker.handle_line(line)
 
-        if line[0:6] in ("CINFO:", "TINFO:", "SINFO:"):
+        if line[0:4] in ("CINF", "TINF", "SINF", "DRV:"):
             event = self.parse_line(line)
             if event is not None:
                 self.builder.apply(event)
 
     def parse_line(self, line: str) -> InfoEvent | None:
-        if not self.progress_tracker.started:
-            self.progress_tracker.start_progress()
+
+        if drive_info_match := self.drive_info_pattern.match(line):
+            drive_info_event = DriveInfoEvent(
+                index=int(drive_info_match.group(1)),
+                drive_name=drive_info_match.group(2),
+                disc_name=drive_info_match.group(3),
+                os_path=drive_info_match.group(4),
+                raw_line=line,
+            )
+            return drive_info_event
 
         if disc_info_match := self.disc_info_pattern.match(line):
             event_code = int(disc_info_match.group(1))
@@ -170,6 +198,10 @@ class MKVInfoParser:
                     raw_line=line,
                 )
                 return stream_info_event
+
+    def extract_active_drive(self):
+        self.progress_tracker.stop_progress()
+        return self.builder.extract_active_drive()
 
     def build(self):
         self.progress_tracker.stop_progress()

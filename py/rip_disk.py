@@ -24,16 +24,25 @@ def check_existing_mkvs(output_path):
 # TODO: option to rip largest title, interactive mode, or all content on disc
 def rip_disk():
 
+    drive_name = None
     mkv_client = MakeMKVClient()
 
-    mkv_client.identify_disc_drive()
-
-    info_parser = MKVInfoParser()
+    drive_info_parser = MKVInfoParser()
     try:
         for line in mkv_client.get_info_lines():
-            info_parser.handle_line(line)
+            drive_info_parser.handle_line(line)
     finally:
-        disc_info = info_parser.build()
+        drive_info = drive_info_parser.extract_active_drive()
+        if drive_info is not None:
+            drive_name, _, _, _ = drive_info
+
+    assert drive_name is not None
+    disc_info_parser = MKVInfoParser()
+    try:
+        for line in mkv_client.get_info_lines(drive_name):
+            disc_info_parser.handle_line(line)
+    finally:
+        disc_info = disc_info_parser.build()
 
     return disc_info
 

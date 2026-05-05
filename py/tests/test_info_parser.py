@@ -1,11 +1,13 @@
-from rip_disk import MKVInfoParser
-from models import MakeMKVDiscInfo
+from pathlib import Path
+
+from media_tools.makemkv_tool.info_parser import MKVInfoParser
+from media_tools.makemkv_tool.models import MakeMKVDiscInfo
+
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 
 def test_drive_info_parse():
-    with open("data/drive-info-test.txt", "r") as f:
-        lines = f.read().splitlines()
-
+    lines = (DATA_DIR / "drive-info-test.txt").read_text(encoding="utf-8").splitlines()
     parser = MKVInfoParser()
     for line in lines:
         parser.handle_line(line)
@@ -22,8 +24,7 @@ def test_drive_info_parse():
 
 
 def test_info_parser_total():
-    with open("data/full-disc-info.txt", "r") as f:
-        lines = f.read().splitlines()
+    lines = (DATA_DIR / "full-disc-info.txt").read_text(encoding="utf-8").splitlines()
 
     disc_info: MakeMKVDiscInfo = MKVInfoParser().parse(lines)
     assert disc_info.disc_title == "INCEPTION"

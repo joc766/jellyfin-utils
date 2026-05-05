@@ -12,10 +12,9 @@ from rich.progress import (
     TaskID,
 )
 
-from models import ProgEvent, ProgTotalEvent, ProgCurrEvent, ProgValueEvent
+from .models import ProgEvent, ProgTotalEvent, ProgCurrEvent, ProgValueEvent
 
 
-# TODO: keep some tasks in the display?
 class MakeMKVProgressTracker:
     PROG_TOTAL_PATTERN = re.compile('^PRGT:(\\d+),(\\d+),"([^"]+)"$')
     PROG_CURR_PATTERN = re.compile('^PRGC:(\\d+),(\\d+),"([^"]+)"$')
@@ -108,9 +107,7 @@ class MakeMKVProgressTracker:
                 if event.code not in self.task_codes:
                     if len(self.total_task_queue) > 0:
                         prev_task_id = self.total_task_queue.pop()
-                        self.progress.update(
-                            prev_task_id, completed=65536
-                        )
+                        self.progress.update(prev_task_id, completed=65536)
                     # add new total_task
                     self.task_codes.add(event.code)
                     self.total_task_queue.append(
@@ -121,9 +118,7 @@ class MakeMKVProgressTracker:
                 if event.code not in self.task_codes:
                     if len(self.curr_task_queue) > 0:
                         prev_task_id = self.curr_task_queue.pop()
-                        self.progress.update(
-                            prev_task_id, completed=65536
-                        )
+                        self.progress.update(prev_task_id, completed=65536)
                     # add new curr_task
                     self.task_codes.add(event.code)
                     self.curr_task_queue.append(

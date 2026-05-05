@@ -1,6 +1,6 @@
 import re
 
-from models import (
+from .models import (
     InfoEvent,
     DriveInfoEvent,
     DiscInfoEvent,
@@ -10,7 +10,7 @@ from models import (
     MakeMKVTitleInfo,
     MakeMKVStreamInfo,
 )
-from progress_tracker import MakeMKVProgressTracker
+from .progress_tracker import MakeMKVProgressTracker
 
 
 class MakeMKVInfoBuilder:

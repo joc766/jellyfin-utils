@@ -1,4 +1,5 @@
-from rip_disk import MKVInfoParser, MakeMKVDiscInfo
+from rip_disk import MKVInfoParser
+from models import MakeMKVDiscInfo
 
 
 def test_info_parser_total():

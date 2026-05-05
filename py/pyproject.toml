@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jellyfin-utils"
+version = "0.0.1"
+description = "Utilities to manage jellyfin server"
+readme = "README.md"
+requires-python = ">= 3.10"
+authors = [{name = "Jack O'Connor",email= "coders-alcoves.7x@icloud.com"}]
+dependencies = [
+  "rich",
+  "python-dotenv",
+  "click",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+media-tools = "media_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

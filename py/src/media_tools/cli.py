@@ -4,13 +4,13 @@ import click
 from pathlib import Path
 from dotenv import load_dotenv
 
-from rip_disk import rip_disk
+from .makemkv_tool.rip_disk import rip_disk
 
 STORAGE_BASE = Path(os.getenv("STORAGE_BASE", "/Volumes/SanDisk"))
 RAW_STORAGE_BASE = STORAGE_BASE / "raw"
 COMPRESSED_STORAGE_BASE = STORAGE_BASE / "compressed"
 
-load_dotenv()
+load_dotenv(override=False)
 
 
 @click.group()
@@ -70,5 +70,9 @@ def rip_disk_cmd(content_type, verbose):
 #     print(ff_command.get_args())
 
 
-if __name__ == "__main__":
+def main():
     cli()
+
+
+if __name__ == "__main__":
+    main()

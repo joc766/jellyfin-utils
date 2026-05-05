@@ -1,6 +1,7 @@
-from client import MakeMKVClient
-from info_parser import MKVInfoParser
-from progress_tracker import MakeMKVProgressTracker
+from pathlib import Path
+
+from .client import MakeMKVClient
+from .info_parser import MKVInfoParser
 
 
 def check_existing_mkvs(output_path):
@@ -22,7 +23,8 @@ def check_existing_mkvs(output_path):
 
 
 # TODO: option to rip largest title, interactive mode, or all content on disc
-def rip_disk():
+# TODO: dipslay some printed output for each major step and/or display a separate step counter
+def rip_disk(verbose: bool = False, output_base: Path | None = None):
 
     drive_name = None
     mkv_client = MakeMKVClient()

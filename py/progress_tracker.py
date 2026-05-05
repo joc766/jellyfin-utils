@@ -48,6 +48,9 @@ class MakeMKVProgressTracker:
         self.finished = True
 
     def handle_line(self, line) -> None:
+        if not self.started:
+            self.start_progress()
+
         line = line.rstrip("\n")
         if line[0:5] in ("PRGT:", "PRGC:", "PRGV:"):
             event = self.parse_line(line)
@@ -130,9 +133,15 @@ class MakeMKVProgressTracker:
                 if len(self.total_task_queue) > 0:
                     total_task_id = self.total_task_queue[0]
                     self.progress.update(total_task_id, completed=event.total)
+                    if self.progress.tasks[total_task_id].finished:
+                        self.progress.update(total_task_id, visible=False)
+                        self.total_task_queue.pop()
                 if len(self.curr_task_queue) > 0:
                     curr_task_id = self.curr_task_queue[0]
                     self.progress.update(curr_task_id, completed=event.current)
+                    if self.progress.tasks[curr_task_id].finished:
+                        self.progress.update(curr_task_id, visible=False)
+                        self.curr_task_queue.pop()
 
     def complete_all(self):
         if len(self.curr_task_queue) > 0:

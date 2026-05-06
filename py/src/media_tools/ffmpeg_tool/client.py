@@ -1,5 +1,9 @@
+import re
+import signal
 import subprocess
 from pathlib import Path
+
+from rich.console import Console
 
 
 class FFmpegClient:
@@ -10,11 +14,13 @@ class FFmpegClient:
         output_path: Path | None = None,
         overwrite: bool = False,
         executable: str = "ffmpeg",
+        console: Console | None = None,
     ):
         self.executable = executable
         self.source_type = source_type
         self.input_path = input_path
         self.overwrite = overwrite
+        self.console = console
 
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
@@ -29,17 +35,6 @@ class FFmpegClient:
             raise FileExistsError(
                 f"output_path {output_path} already exists and overwrite = False."
             )
-
-    """
-        ffmpeg -nostdin -progress pipe:1 -nostats
-        -i "/Volumes/SanDisk/raw/tv/HOW_I_MET_YOUR_MOTHER_S2_D1_US/How I Met Your Mother S2E01_original.mkv"
-        -map_metadata 0 -map_chapters 0 -map 0:v:0 -map 0:a:0 -sn
-        -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -profile:v high -level 4.1
-        -maxrate 20M -bufsize 20M -x264-params interlaced=0
-        -c:a libfdk_aac -ac 2 -ab 256k
-        -movflags +faststart -fflags +genpts -avoid_negative_ts make_zero
-        "/Volumes/SanDisk/raw/tv/HOW_I_MET_YOUR_MOTHER_S2_D1_US/How I Met Your Mother S2E01.mp4
-    """
 
     def get_ffprobe_duration(self) -> float:
         """Returns the max duration between the first video stream and first audio stream"""
@@ -149,10 +144,16 @@ class FFmpegClient:
 
         assert ffmpeg_proc.stdout is not None
 
+        # Hacky fix: use interrupted flag to handle interrupt
+        interrupted = False
         try:
             yield from ffmpeg_proc.stdout
+        except KeyboardInterrupt:
+            ffmpeg_proc.send_signal(signal.SIGINT)
+            interrupted = True
         finally:
             res = ffmpeg_proc.wait()
-            print(res)
+            if interrupted:
+                raise InterruptedError("FFmpeg Aborted!")
             if res != 0:
                 raise RuntimeError(f"ffmpeg failed with exit code {res}")

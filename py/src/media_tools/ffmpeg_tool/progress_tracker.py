@@ -27,6 +27,7 @@ class FFmpegProgressTracker:
     def __init__(self, title_duration: float):
         """duration: duration in seconds"""
         self.started = False
+        self.stopped = False
         self.duration = title_duration
         self.task_id = None
 
@@ -45,6 +46,10 @@ class FFmpegProgressTracker:
         self.task_id = self.progress.add_task(
             "[green]Running ffmpeg compression", total=self.duration
         )
+
+    def stop_progress(self):
+        self.stopped = True
+        self.progress.stop()
 
     # TODO: add a track_progress function to handle each line?
 

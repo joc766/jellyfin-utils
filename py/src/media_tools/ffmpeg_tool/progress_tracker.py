@@ -51,7 +51,7 @@ class FFmpegProgressTracker:
         self.stopped = True
         self.progress.stop()
 
-    # TODO: add a track_progress function to handle each line?
+    # TODO: add a track_progress function to handle full input?
 
     def handle_line(self, line: str):
         if not self.started:

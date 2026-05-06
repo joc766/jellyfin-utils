@@ -1,9 +1,13 @@
+import os
 from pathlib import Path
 
 from media_tools.makemkv_tool.progress_tracker import MakeMKVProgressTracker
 
 from .client import MakeMKVClient
 from .info_parser import MKVInfoParser
+
+STORAGE_BASE = Path(os.getenv("STORAGE_BASE", "/Volumes/SanDisk"))
+RAW_STORAGE_BASE = STORAGE_BASE / "raw"
 
 
 def check_existing_mkvs(output_path):
@@ -27,7 +31,14 @@ def check_existing_mkvs(output_path):
 # TODO: improve title selection so you can see all titles
 # instead of one at a time
 # TODO: make more testable with mock data for the mkv ripping step
-def rip_disk(output_base: Path, verbose: bool = False, overwrite: bool = False):
+def rip_disk(
+    content_type: str = "DVD",
+    output_base: Path | None = None,
+    verbose: bool = False,
+    overwrite: bool = False,
+):
+    if output_base is None:
+        output_base = RAW_STORAGE_BASE / content_type
 
     drive_name = None
     mkv_client = MakeMKVClient()

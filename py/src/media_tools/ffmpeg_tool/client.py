@@ -9,28 +9,14 @@ class FFmpegClient:
         self,
         input_path: Path,
         source_type: str = "DVD",
-        output_dir: Path | None = None,
-        overwrite: bool = False,
         executable: str = "ffmpeg",
     ):
         self.executable = executable
         self.source_type = source_type
         self.input_path = input_path
-        self.overwrite = overwrite
 
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
-
-        if output_dir is None:
-            self.output_path = (
-                self.input_path.parent / f"{self.input_path.stem.replace('_original', '')}.mp4"
-            )
-        else:
-            self.output_path = output_dir / f"{self.input_path.stem.replace('_original', '')}.mp4"
-        if self.output_path.exists() and not overwrite:
-            raise FileExistsError(
-                f"output_path {self.output_path} already exists and overwrite = False."
-            )
 
     def get_ffprobe_duration(self) -> float:
         """Returns the max duration between the first video stream and first audio stream"""
@@ -87,13 +73,13 @@ class FFmpegClient:
 
         return max([video_duration, audio_duration])
 
-    def start_compress_mkv(self):
+    def start_compress_mkv(self, output: Path, overwrite: bool = False):
         """
         Starts ffmpeg with the h264 and AAC codecs for the first video stream and first audio stream.
         Re-containerizes to MP4 and ensures consistency across inputs.
         """
         command = [self.executable]
-        if self.overwrite:
+        if overwrite:
             command.append("-y")
         else:
             command.append("-n")
@@ -127,7 +113,7 @@ class FFmpegClient:
             command.extend(
                 ["-vf", "scale=trunc(480*dar/2)*2:480:flags=lanczos,setsar=1,setfield=prog"]
             )
-        command.append(str(self.output_path))
+        command.append(str(output))
 
         ffmpeg_proc = subprocess.Popen(
             command,

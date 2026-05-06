@@ -1,4 +1,4 @@
-import os
+from os import path
 from pathlib import Path
 
 import click
@@ -7,9 +7,6 @@ from dotenv import load_dotenv
 from .ffmpeg_tool import compress_mkv
 from .makemkv_tool import rip_disk
 
-STORAGE_BASE = Path(os.getenv("STORAGE_BASE", "/Volumes/SanDisk"))
-RAW_STORAGE_BASE = STORAGE_BASE / "raw"
-COMPRESSED_STORAGE_BASE = STORAGE_BASE / "compressed"
 
 load_dotenv(override=False)
 
@@ -23,21 +20,42 @@ def cli():
 @click.option("--tv", "content_type", flag_value="tv")
 @click.option("--movie", "content_type", flag_value="movie", default=True)
 @click.option("--verbose", "-v", is_flag=True)
-def rip_disk_cmd(content_type: str, verbose: bool):
-    output_base = RAW_STORAGE_BASE / content_type.lower()
-    rip_disk(output_base, verbose=verbose)
+@click.option("--output_base", "-o", "output_base", type=click.Path(path_type=Path))
+def rip_disk_cmd(output_base: Path, content_type: str, verbose: bool = False):
+    rip_disk(content_type, output_base=output_base, verbose=verbose)
 
 
 @cli.command("compress")
 @click.option("--dvd", "-d", "disc_type", flag_value="DVD", default=True)
 @click.option("--bd", "-b", "disc_type", flag_value="BD")
+@click.option("--movie", "content_type", flag_value="movie", default=True)
+@click.option("--tv", "content_type", flag_value="tv")
 @click.option("--overwrite", "-f", "overwrite", is_flag=True)
-@click.option("--output", "-o", "output_dir", type=click.Path(path_type=Path))
+@click.option("--output", "-o", type=click.Path(path_type=Path))
+@click.option("--output_dir", "output_dir", type=click.Path(path_type=Path))
+@click.option("--output_filename", "output_filename", type=str)
+@click.option("--container", "-c", "container", type=str, default="mp4")
 @click.argument("input_path", type=click.Path(path_type=Path))
 def compress_mkv_cmd(
-    input_path: Path, disc_type: str, overwrite: bool, output_dir: Path | None = None
+    input_path: Path,
+    disc_type: str,
+    content_type: str,
+    overwrite: bool,
+    container: str,
+    output: Path | None = None,
+    output_dir: Path | None = None,
+    output_filename: str | None = None,
 ):
-    compress_mkv(input_path, disc_type, overwrite=overwrite, output_dir=output_dir)
+    compress_mkv(
+        input_path,
+        disc_type,
+        content_type=content_type,
+        output=output,
+        output_dir=output_dir,
+        output_filename=output_filename,
+        output_container=container,
+        overwrite=overwrite,
+    )
 
 
 # @click.command()

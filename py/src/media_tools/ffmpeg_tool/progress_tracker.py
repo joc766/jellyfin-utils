@@ -46,6 +46,8 @@ class FFmpegProgressTracker:
             "[green]Running ffmpeg compression", total=self.duration
         )
 
+    # TODO: add a track_progress function to handle each line?
+
     def handle_line(self, line: str):
         if not self.started:
             self.start_progress()

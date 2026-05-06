@@ -5,15 +5,16 @@ from pathlib import Path
 class FFmpegClient:
     def __init__(
         self,
-        input_path: str,
+        input_path: Path,
         source_type: str = "DVD",
-        output_path: str | None = None,
+        output_path: Path | None = None,
         overwrite: bool = False,
         executable: str = "ffmpeg",
     ):
         self.executable = executable
         self.source_type = source_type
-        self.input_path = Path(input_path)
+        self.input_path = input_path
+        self.overwrite = overwrite
 
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
@@ -23,11 +24,11 @@ class FFmpegClient:
                 self.input_path.parent / f"{self.input_path.stem.replace('_original', '')}.mp4"
             )
         else:
-            self.output_path = Path(output_path)
-            if self.output_path.exists() and not overwrite:
-                raise FileExistsError(
-                    f"output_path {output_path} already exists and overwrite = False."
-                )
+            self.output_path = output_path
+        if self.output_path.exists() and not overwrite:
+            raise FileExistsError(
+                f"output_path {output_path} already exists and overwrite = False."
+            )
 
     """
         ffmpeg -nostdin -progress pipe:1 -nostats
@@ -43,7 +44,11 @@ class FFmpegClient:
     # TODO: handle overwrite later without -y and -nostdin
     def start_compress_mkv(self):
         command = [self.executable]
-        command.extend(["-nostdin", "-y", "-progress", "pipe:1", "-nostats"])
+        if self.overwrite:
+            command.append("-y")
+        else:
+            command.append("-n")
+        command.extend(["-nostdin", "-progress", "pipe:1", "-nostats"])
         command.extend(["-i", str(self.input_path)])
         command.extend(
             ["-map_metadata", "0", "-map_chapters", "0", "-map", "0:v:0", "-map", "0:a:0", "-sn"]
@@ -76,7 +81,12 @@ class FFmpegClient:
         command.append(str(self.output_path))
 
         ffmpeg_proc = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
         )
 
         assert ffmpeg_proc.stdout is not None
@@ -85,5 +95,6 @@ class FFmpegClient:
             yield from ffmpeg_proc.stdout
         finally:
             res = ffmpeg_proc.wait()
+            print(res)
             if res != 0:
                 raise RuntimeError(f"ffmpeg failed with exit code {res}")

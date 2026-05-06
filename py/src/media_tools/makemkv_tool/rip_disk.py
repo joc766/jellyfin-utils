@@ -81,9 +81,13 @@ def rip_disk(output_base: Path, verbose: bool = False, overwrite: bool = False):
     for i, title_id in enumerate(titles_to_rip):
         print(f"Ripping title_id {title_id} ({i}/{len(titles_to_rip)})")
         mkv_progress = MakeMKVProgressTracker()
-        for line in mkv_client.start_mkv_process(
-            drive_name, output_path, cache_size=cache_size, title_id=title_id
-        ):
-            if verbose:
-                print(line)
-            mkv_progress.handle_line(line)
+        try:
+            for line in mkv_client.start_mkv_process(
+                drive_name, output_path, cache_size=cache_size, title_id=title_id
+            ):
+                if verbose:
+                    print(line)
+                mkv_progress.handle_line(line)
+        finally:
+            if not mkv_progress.finished:
+                mkv_progress.stop_progress()

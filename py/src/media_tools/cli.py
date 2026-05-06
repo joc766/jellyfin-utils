@@ -23,21 +23,21 @@ def cli():
 @click.option("--tv", "content_type", flag_value="tv")
 @click.option("--movie", "content_type", flag_value="movie", default=True)
 @click.option("--verbose", "-v", is_flag=True)
-def rip_disk_cmd(content_type, verbose):
+def rip_disk_cmd(content_type: str, verbose: bool):
     output_base = RAW_STORAGE_BASE / content_type.lower()
-    rip_disk(verbose, output_base)
+    rip_disk(output_base, verbose=verbose)
 
 
 @cli.command("compress")
 @click.option("--dvd", "-d", "disc_type", flag_value="DVD", default=True)
 @click.option("--bd", "-b", "disc_type", flag_value="BD")
 @click.option("--overwrite", "-f", "overwrite", is_flag=True)
-@click.option("--output", "-o", "output_path", type=click.Path(path_type=Path))
+@click.option("--output", "-o", "output_dir", type=click.Path(path_type=Path))
 @click.argument("input_path", type=click.Path(path_type=Path))
 def compress_mkv_cmd(
-    input_path: Path, disc_type: str, overwrite: bool, output_path: Path | None = None
+    input_path: Path, disc_type: str, overwrite: bool, output_dir: Path | None = None
 ):
-    compress_mkv(input_path, disc_type, overwrite=overwrite, output_path=output_path)
+    compress_mkv(input_path, disc_type, overwrite=overwrite, output_dir=output_dir)
 
 
 # @click.command()

@@ -12,11 +12,11 @@ console = Console(stderr=True)
 def compress_mkv(
     input_path: Path,
     source_type: str,
-    output_path: Path | None = None,
+    output_dir: Path | None = None,
     overwrite: bool = False,
 ):
     try:
-        client = FFmpegClient(input_path, source_type, output_path=output_path, overwrite=overwrite)
+        client = FFmpegClient(input_path, source_type, output_dir=output_dir, overwrite=overwrite)
     except FileExistsError as e:
         console.print(f"ERROR: {e}", style="bold red")
         exit(1)

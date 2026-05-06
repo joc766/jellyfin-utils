@@ -3,37 +3,33 @@ import signal
 import subprocess
 from pathlib import Path
 
-from rich.console import Console
-
 
 class FFmpegClient:
     def __init__(
         self,
         input_path: Path,
         source_type: str = "DVD",
-        output_path: Path | None = None,
+        output_dir: Path | None = None,
         overwrite: bool = False,
         executable: str = "ffmpeg",
-        console: Console | None = None,
     ):
         self.executable = executable
         self.source_type = source_type
         self.input_path = input_path
         self.overwrite = overwrite
-        self.console = console
 
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
 
-        if output_path is None:
+        if output_dir is None:
             self.output_path = (
                 self.input_path.parent / f"{self.input_path.stem.replace('_original', '')}.mp4"
             )
         else:
-            self.output_path = output_path
+            self.output_path = output_dir / f"{self.input_path.stem.replace('_original', '')}.mp4"
         if self.output_path.exists() and not overwrite:
             raise FileExistsError(
-                f"output_path {output_path} already exists and overwrite = False."
+                f"output_path {self.output_path} already exists and overwrite = False."
             )
 
     def get_ffprobe_duration(self) -> float:

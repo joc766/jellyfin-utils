@@ -41,8 +41,66 @@ class FFmpegClient:
         "/Volumes/SanDisk/raw/tv/HOW_I_MET_YOUR_MOTHER_S2_D1_US/How I Met Your Mother S2E01.mp4
     """
 
-    # TODO: handle overwrite later without -y and -nostdin
+    def get_ffprobe_duration(self) -> float:
+        """Returns the max duration between the first video stream and first audio stream"""
+        video_command = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream_tags=DURATION-eng",
+            "-of",
+            "default=nw=1",
+            str(self.input_path),
+        ]
+        audio_command = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream_tags=DURATION-eng",
+            "-of",
+            "default=nw=1",
+            str(self.input_path),
+        ]
+
+        # Calculate video duration in seconds
+        video_result = subprocess.run(video_command, capture_output=True, text=True)
+        assert video_result.stdout is not None
+        video_duration_match = re.search(
+            "^TAG:DURATION-eng=(\\d{2}):(\\d{2}):(\\d{2}.\\d+)$", video_result.stdout.rstrip("\n")
+        )
+        assert video_duration_match is not None
+        hours, minutes, seconds = video_duration_match.group(1, 2, 3)
+        video_duration = 0.0
+        video_duration += int(hours) * 3600
+        video_duration += int(minutes) * 60
+        video_duration += float(seconds)
+
+        # Calculate audio duration in seconds
+        audio_result = subprocess.run(audio_command, bufsize=1, capture_output=True, text=True)
+        assert audio_result.stdout is not None
+        audio_duration_match = re.search(
+            "^TAG:DURATION-eng=(\\d{2}):(\\d{2}):(\\d{2}.\\d+)", audio_result.stdout.rstrip("\n")
+        )
+        assert audio_duration_match is not None
+        hours, minutes, seconds = audio_duration_match.group(1, 2, 3)
+        audio_duration = 0.0
+        audio_duration += int(hours) * 3600
+        audio_duration += int(minutes) * 60
+        audio_duration += float(seconds)
+
+        return max([video_duration, audio_duration])
+
     def start_compress_mkv(self):
+        """
+        Starts ffmpeg with the h264 and AAC codecs for the first video stream and first audio stream.
+        Re-containerizes to MP4 and ensures consistency across inputs.
+        """
         command = [self.executable]
         if self.overwrite:
             command.append("-y")

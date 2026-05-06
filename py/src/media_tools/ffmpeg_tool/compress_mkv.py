@@ -13,7 +13,6 @@ console = Console(stderr=True)
 def compress_mkv(
     input_path: Path,
     source_type: str,
-    input_duration: float | None = None,
     output_path: Path | None = None,
     overwrite: bool = False,
 ):
@@ -26,10 +25,7 @@ def compress_mkv(
     except Exception as e:
         raise (e)
 
-    if input_duration is None:
-        # TODO: automatically determine duration with ffprobe
-        input_duration = 6000.00
-        pass
+    input_duration = client.get_ffprobe_duration()
 
     progress_tracker = FFmpegProgressTracker(input_duration)
     print("Compressing with FFmpeg...")

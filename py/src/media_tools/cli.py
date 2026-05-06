@@ -4,7 +4,8 @@ from pathlib import Path
 import click
 from dotenv import load_dotenv
 
-from .makemkv_tool.rip_disk import rip_disk
+from .ffmpeg_tool import compress_mkv
+from .makemkv_tool import rip_disk
 
 STORAGE_BASE = Path(os.getenv("STORAGE_BASE", "/Volumes/SanDisk"))
 RAW_STORAGE_BASE = STORAGE_BASE / "raw"
@@ -18,13 +19,25 @@ def cli():
     pass
 
 
-@cli.command("rip_disk")
+@cli.command("rip")
 @click.option("--tv", "content_type", flag_value="tv")
 @click.option("--movie", "content_type", flag_value="movie", default=True)
 @click.option("--verbose", "-v", is_flag=True)
 def rip_disk_cmd(content_type, verbose):
     output_base = RAW_STORAGE_BASE / content_type.lower()
     rip_disk(verbose, output_base)
+
+
+@cli.command("compress")
+@click.option("--dvd", "-d", "disc_type", flag_value="DVD", default=True)
+@click.option("--bd", "-b", "disc_type", flag_value="BD")
+@click.option("--overwrite", "-f", "overwrite", is_flag=True)
+@click.option("--output", "-o", "output_path", type=click.Path(path_type=Path))
+@click.argument("input_path", type=click.Path(path_type=Path))
+def compress_mkv_cmd(
+    input_path: Path, disc_type: str, overwrite: bool, output_path: Path | None = None
+):
+    compress_mkv(input_path, disc_type, overwrite=overwrite, output_path=output_path)
 
 
 # @click.command()

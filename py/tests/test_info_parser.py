@@ -3,7 +3,7 @@ from pathlib import Path
 from media_tools.makemkv_tool.info_parser import MKVInfoParser
 from media_tools.makemkv_tool.models import MakeMKVDiscInfo
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
 def test_drive_info_parse():

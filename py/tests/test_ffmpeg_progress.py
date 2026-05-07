@@ -2,7 +2,7 @@ from pathlib import Path
 
 from media_tools.ffmpeg_tool.progress_tracker import FFmpegProgressTracker
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+DATA_DIR = Path(__file__).parent / "data"
 
 
 def test_ffmpeg_progress_tracker():

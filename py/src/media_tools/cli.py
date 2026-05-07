@@ -1,4 +1,3 @@
-from os import path
 from pathlib import Path
 
 import click
@@ -6,7 +5,6 @@ from dotenv import load_dotenv
 
 from .ffmpeg_tool import compress_mkv
 from .makemkv_tool import rip_disk
-
 
 load_dotenv(override=False)
 
@@ -46,16 +44,19 @@ def compress_mkv_cmd(
     output_dir: Path | None = None,
     output_filename: str | None = None,
 ):
-    compress_mkv(
-        input_path,
-        disc_type,
-        content_type=content_type,
-        output=output,
-        output_dir=output_dir,
-        output_filename=output_filename,
-        output_container=container,
-        overwrite=overwrite,
-    )
+    try:
+        compress_mkv(
+            input_path,
+            disc_type,
+            content_type=content_type,
+            output=output,
+            output_dir=output_dir,
+            output_filename=output_filename,
+            output_container=container,
+            overwrite=overwrite,
+        )
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
 # @click.command()

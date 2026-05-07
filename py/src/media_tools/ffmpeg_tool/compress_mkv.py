@@ -34,8 +34,8 @@ def make_output_path(
 
 def compress_mkv(
     input_path: Path,
-    source_type: str,
-    content_type: str,
+    source_type: str = "DVD",
+    content_type: str = "movie",
     output: Path | None = None,
     output_dir: Path | None = None,
     output_filename: str | None = None,
@@ -51,16 +51,15 @@ def compress_mkv(
             output_filename=output_filename,
         )
 
+    if output.exists() and not overwrite:
+        raise FileExistsError(f"'{output}' already exists and overwrite=False")
     if not output.parent.exists():
-        output.parent.mkdir()
+        output.parent.mkdir(parents=True)
 
     try:
         client = FFmpegClient(input_path, source_type)
-    except FileExistsError as e:
-        console.print(f"ERROR: {e}", style="bold red")
-        exit(1)
     except Exception as e:
-        raise (e)
+        raise e
 
     input_duration = client.get_ffprobe_duration()
 

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from media_tools.makemkv_tool.progress_tracker import MakeMKVProgressTracker
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
 def test_mkv_progress_tracker_info():

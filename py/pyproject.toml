@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "boto3"]
 
 [project.scripts]
 media-tools = "media_tools.cli:main"
@@ -39,6 +39,7 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "-m 'not slow'"
 markers = [
   "slow: tests that are long-running and therefore optional",
 ]

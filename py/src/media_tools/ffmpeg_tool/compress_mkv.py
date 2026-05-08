@@ -63,14 +63,14 @@ def compress_mkv(
 
     input_duration = client.get_ffprobe_duration()
 
-    progress_tracker = FFmpegProgressTracker(input_duration)
+    progress = FFmpegProgressTracker(input_duration)
     print("Compressing with FFmpeg...")
     try:
         for line in client.start_compress_mkv(output, overwrite=overwrite):
-            progress_tracker.handle_line(line)
+            progress.handle_line(line)
     except InterruptedError as e:
-        progress_tracker.stop_progress()
+        progress.stop_progress()
         console.print(e, style="bold blue")
     finally:
-        if not progress_tracker.stopped:
-            progress_tracker.stop_progress()
+        if not progress.stopped:
+            progress.stop_progress()

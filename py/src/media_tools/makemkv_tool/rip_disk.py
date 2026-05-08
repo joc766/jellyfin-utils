@@ -1,10 +1,9 @@
 import os
 from pathlib import Path
 
-from media_tools.makemkv_tool.progress_tracker import MakeMKVProgressTracker
-
 from .client import MakeMKVClient
 from .info_parser import MKVInfoParser
+from .progress import MakeMKVProgressTracker
 
 STORAGE_BASE = Path(os.getenv("STORAGE_BASE", "/Volumes/SanDisk"))
 RAW_STORAGE_BASE = STORAGE_BASE / "raw"

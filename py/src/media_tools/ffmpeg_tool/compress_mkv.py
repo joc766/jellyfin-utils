@@ -4,7 +4,7 @@ from pathlib import Path
 from rich.console import Console
 
 from .client import FFmpegClient
-from .progress_tracker import FFmpegProgressTracker
+from .progress import FFmpegProgressTracker
 
 STORAGE_BASE = Path(os.getenv("STORAGE_BASE", "/Volumes/SanDisk"))
 COMPRESSED_STORAGE_BASE = STORAGE_BASE / "compressed"

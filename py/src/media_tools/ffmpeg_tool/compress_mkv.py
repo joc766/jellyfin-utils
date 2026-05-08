@@ -20,7 +20,7 @@ def make_output_path(
     output_filename: str | None = None,
 ) -> Path:
     if output_filename is None:
-        output_filename = input_path.stem.replace("_original", "")
+        output_filename = input_path.stem
     else:
         output_filename = "".join(output_filename.split(".")[0:-1])
 

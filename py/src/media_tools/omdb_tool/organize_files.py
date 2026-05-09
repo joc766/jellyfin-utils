@@ -7,11 +7,16 @@ OMDB_BASE_URL = "https://omdbapi.com"
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 
 
+class MissingCredentialsError(Exception):
+    """Raised when OMBD API Key not provided."""
+
+    pass
+
+
 def get_title(imdb_id: str) -> str:
     if OMDB_API_KEY is None:
-        raise ValueError("OMDB_API_KEY cannot be None.")
+        raise MissingCredentialsError("OMDB_API_KEY cannot be None.")
     req_url = f"{OMDB_BASE_URL}?i={imdb_id}&apikey={OMDB_API_KEY}"
-    print(req_url)
     response = requests.get(req_url)
     if response.status_code == 200:
         response_body = response.json()

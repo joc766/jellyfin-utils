@@ -1,5 +1,5 @@
 """Tools for OMDB"""
 
-from .organize_files import rename_movie
+from .organize_files import MissingCredentialsError, rename_movie
 
-__all__ = ["rename_movie"]
+__all__ = ["rename_movie", "MissingCredentialsError"]

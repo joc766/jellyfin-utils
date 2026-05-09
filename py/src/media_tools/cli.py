@@ -6,14 +6,25 @@ from rich import get_console
 
 from .ffmpeg_tool import compress_mkv
 from .makemkv_tool import rip_disk
+from .omdb_tool import MissingCredentialsError, rename_movie
 
-load_dotenv(override=False)
+load_dotenv("/Users/linkit/Projects/gh/jellyfin-utils/.env", override=False)
 console = get_console()
 
 
 @click.group()
 def cli():
     pass
+
+
+@cli.command("organize")
+@click.argument("path", type=click.Path(path_type=Path))
+@click.argument("imdb_id", type=str)
+def organize_cmd(path: Path, imdb_id: str):
+    try:
+        rename_movie(path, imdb_id)
+    except MissingCredentialsError as e:
+        raise click.ClickException(str(e)) from e
 
 
 @cli.command("rip")

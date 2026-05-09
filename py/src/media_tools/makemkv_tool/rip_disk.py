@@ -1,5 +1,8 @@
 import os
 from pathlib import Path
+from rich import get_console
+
+from rich.prompt import Confirm
 
 from .client import MakeMKVClient
 from .info_parser import MKVInfoParser
@@ -8,6 +11,7 @@ from .progress import MakeMKVProgressTracker
 STORAGE_BASE = Path(os.getenv("STORAGE_BASE", "/Volumes/SanDisk"))
 RAW_STORAGE_BASE = STORAGE_BASE / "raw"
 
+console = get_console()
 
 def check_existing_mkvs(output_path):
     # Handle existing MKVs in output path
@@ -16,11 +20,9 @@ def check_existing_mkvs(output_path):
 
     existing_mkvs = list(output_path.glob("*.mkv"))
     if len(existing_mkvs) > 0:
-        clear_dir = input(
-            f"""{output_path} contains MKV files. Would you
-                like to continue and overwrite these files? (y/N): """
-        )
-        if clear_dir == "Y" or clear_dir == "y":
+        if Confirm.ask(
+            f"{output_path} contains MKV files. Would you like to continue and overwrite these files?"
+        ):
             for file in existing_mkvs:
                 file.unlink()
 
@@ -44,7 +46,7 @@ def rip_disk(
 
     # TODO: this can be done better by using `drutil` to save time (however, may be less compatible)
     drive_info_parser = MKVInfoParser()
-    print("Identifying active drives...")
+    console.print("Identifying active drives...")
     try:
         for line in mkv_client.get_info_lines():
             drive_info_parser.handle_line(line)
@@ -55,7 +57,7 @@ def rip_disk(
 
     assert drive_name is not None
     disc_info_parser = MKVInfoParser()
-    print("Extracting disc information...")
+    console.print("Extracting disc information...")
     try:
         for line in mkv_client.get_info_lines(drive_name):
             disc_info_parser.handle_line(line)
@@ -81,22 +83,22 @@ def rip_disk(
     titles = disc_info.titles.values()
     titles_to_rip = []
     for title in titles:
-        response = input(
-            f"{title.title_name} (title_id {title.title_id}) has duration {title.duration}. Would you like to rip it? (y/N): "
-        )
-        if response in ("y", "Y", "Yes", "yes", "YES"):
-            titles_to_rip.append(title.title_id)
+        if Confirm.ask(
+            f"{title.title_name} (title_id {title.title_id}) has duration {title.duration}. Would you like to rip it?"
+        ):
+            titles_to_rip.append((title.title_id, title.title_name))
 
-    print("Beginning makemkvcon...")
-    for i, title_id in enumerate(titles_to_rip):
-        print(f"Ripping title_id {title_id} ({i}/{len(titles_to_rip)})")
+    console.print("Beginning makemkvcon...")
+    for i, title_info in enumerate(titles_to_rip):
+        title_id, title_name = title_info
+        console.print(f"Ripping {title_name} ({i + 1}/{len(titles_to_rip)})")
         mkv_progress = MakeMKVProgressTracker()
         try:
             for line in mkv_client.start_mkv_process(
                 drive_name, output_path, cache_size=cache_size, title_id=title_id
             ):
                 if verbose:
-                    print(line)
+                    console.print(line)
                 mkv_progress.handle_line(line)
         finally:
             if not mkv_progress.finished:

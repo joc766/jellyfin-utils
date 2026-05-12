@@ -1,0 +1,29 @@
+MSG:1005,0,1,"MakeMKV v1.18.3 darwin(arm64-release) started","%1 started","MakeMKV v1.18.3 darwin(arm64-release)"
+MSG:1009,0,1,"Profile parsing error: default profile missing, using builtin default","Profile parsing error: %1","default profile missing, using builtin default"
+PRGT:5018,0,"Scanning CD-ROM devices"
+PRGC:5018,0,"Scanning CD-ROM devices"
+PRGV:0,0,65536
+PRGV:0,0,65536
+MSG:2010,0,1,"Optical drive \"BD-ROM hp DVDWBD SN-406AB HH01 R90Q6YLD900132d\" opened in OS access mode.","Optical drive \"%1\" opened in OS access mode.","BD-ROM hp DVDWBD SN-406AB HH01 R90Q6YLD900132d"
+PRGV:65536,0,65536
+PRGV:65536,65536,65536
+DRV:0,2,999,12,"BD-ROM hp DVDWBD SN-406AB HH01 R90Q6YLD900132","THE_BRUTALIST","/dev/rdisk6"
+DRV:1,256,999,0,"","",""
+DRV:2,256,999,0,"","",""
+DRV:3,256,999,0,"","",""
+DRV:4,256,999,0,"","",""
+DRV:5,256,999,0,"","",""
+DRV:6,256,999,0,"","",""
+DRV:7,256,999,0,"","",""
+DRV:8,256,999,0,"","",""
+DRV:9,256,999,0,"","",""
+DRV:10,256,999,0,"","",""
+DRV:11,256,999,0,"","",""
+DRV:12,256,999,0,"","",""
+DRV:13,256,999,0,"","",""
+DRV:14,256,999,0,"","",""
+DRV:15,256,999,0,"","",""
+PRGV:0,65536,65536
+PRGV:0,0,65536
+MSG:5010,0,0,"Failed to open disc","Failed to open disc"
+TCOUNT:0

@@ -34,6 +34,11 @@ def get_title(imdb_id: str) -> str:
 
 
 def rename_movie(movie_path: Path, imdb_id: str) -> Path:
+    if not movie_path.exists():
+        raise FileNotFoundError(f"{movie_path} does not exist")
+    if not movie_path.is_file():
+        raise ValueError("[movie_path] must be a file, not a directory")
+
     parent_path = movie_path.parent
     title = get_title(imdb_id)
     new_movie_file_name = f"{title}{movie_path.suffix}"

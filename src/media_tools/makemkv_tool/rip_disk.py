@@ -1,11 +1,14 @@
-import os
 from pathlib import Path
-from rich import get_console
+import os
 
+from InquirerPy.base.control import Choice
+from InquirerPy.prompts.checkbox import CheckboxPrompt
+from rich import get_console
 from rich.prompt import Confirm
 
 from .client import MakeMKVClient
 from .info_parser import MKVInfoParser
+from .models import MakeMKVTitleInfo
 from .progress import MakeMKVProgressTracker
 
 STORAGE_BASE = Path(os.getenv("STORAGE_BASE", "/Volumes/SanDisk"))
@@ -31,7 +34,6 @@ def check_existing_mkvs(output_path):
     return
 
 
-# TODO: improve title selection so you can see all titles instead of one at a time
 # TODO: add dry run option for easier testing
 # TODO: Handle cleaning file names to proper directory names
 def rip_disk(
@@ -83,21 +85,25 @@ def rip_disk(
         check_existing_mkvs(output_path)
 
     titles = disc_info.titles.values()
-    titles_to_rip = []
-    for title in titles:
-        if Confirm.ask(
-            f"{title.title_name} (title_id {title.title_id}) has duration {title.duration}. Would you like to rip it?"
-        ):
-            titles_to_rip.append((title.title_id, title.title_name))
+    selected_titles = CheckboxPrompt(
+        message="Select titles to rip:",
+        choices=[
+            Choice(title.title_id, name=f"{title.title_name} (duration: {title.duration})")
+            for title in titles
+        ],
+        transformer=lambda result: f"{len(result)} title{'s' if len(result) > 1 else ''} selected",
+    ).execute()
+    titles_to_rip: list[MakeMKVTitleInfo] = [
+        disc_info.titles[title_id] for title_id in selected_titles
+    ]
 
     console.print("Beginning makemkvcon...")
-    for i, title_info in enumerate(titles_to_rip):
-        title_id, title_name = title_info
-        console.print(f"Ripping {title_name} ({i + 1}/{len(titles_to_rip)})")
+    for i, title in enumerate(titles_to_rip):
+        console.print(f"Ripping {title.title_name} ({i + 1}/{len(titles_to_rip)})")
         mkv_progress = MakeMKVProgressTracker()
         try:
             for line in mkv_client.start_mkv_process(
-                drive_name, output_path, cache_size=cache_size, title_id=title_id
+                drive_name, output_path, cache_size=cache_size, title_id=title.title_id
             ):
                 if verbose:
                     console.print(line)

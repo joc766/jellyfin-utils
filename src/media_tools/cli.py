@@ -37,6 +37,8 @@ def organize_cmd(path: Path, imdb_id: str):
         rename_movie(path, imdb_id)
     except MissingCredentialsError as e:
         raise click.ClickException(str(e)) from e
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
 @cli.command("rip")

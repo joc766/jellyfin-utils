@@ -30,8 +30,17 @@ def test_ffprobe_duration():
     test_mkv = get_large_test_file()
     client = FFmpegClient(test_mkv, "DVD")
     correct_duration = 147.213733333
-    returned_duration = client.get_ffprobe_duration()
+    ffprobe_info = client.get_ffprobe_info()
+    returned_duration = ffprobe_info["duration"]
     assert correct_duration == returned_duration
+
+
+def test_ffprobe_field_order():
+    test_mkv = get_large_test_file()
+    client = FFmpegClient(test_mkv, "DVD")
+    ffprobe_info = client.get_ffprobe_info()
+    returned_field_order = ffprobe_info["field_order"]
+    assert returned_field_order == "progressive"
 
 
 # This test may take a couple minutes

@@ -42,6 +42,7 @@ def compress_mkv(
     output_filename: str | None = None,
     output_container: str = "mp4",
     overwrite: bool = False,
+    verbose: bool = False,
 ):
     if output is None:
         output = make_output_path(
@@ -62,12 +63,19 @@ def compress_mkv(
     except Exception as e:
         raise e
 
-    input_duration = client.get_ffprobe_duration()
+    ffprobe_info = client.get_ffprobe_info()
 
-    progress = FFmpegProgressTracker(input_duration)
+    progress = FFmpegProgressTracker(ffprobe_info["duration"])
     print("Compressing with FFmpeg...")
     try:
-        for line in client.start_compress_mkv(output, overwrite=overwrite):
+        # not the most sensible to send the field_order back to the client
+        if ffprobe_info["field_order"] != "progressive":
+            deinterlace = True
+        else:
+            deinterlace = False
+        for line in client.start_compress_mkv(
+            output, overwrite=overwrite, deinterlace=deinterlace, verbose=verbose
+        ):
             progress.handle_line(line)
     except InterruptedError as e:
         progress.stop_progress()

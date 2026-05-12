@@ -2,6 +2,12 @@ import re
 import signal
 import subprocess
 from pathlib import Path
+from typing import Any
+
+from rich import get_console
+from rich.text import Text
+
+console = get_console()
 
 
 class FFmpegClient:
@@ -18,7 +24,7 @@ class FFmpegClient:
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
 
-    def get_ffprobe_duration(self) -> float:
+    def get_ffprobe_info(self) -> dict[str, Any]:
         """Returns the max duration between the first video stream and first audio stream"""
         video_command = [
             "ffprobe",
@@ -28,6 +34,8 @@ class FFmpegClient:
             "v:0",
             "-show_entries",
             "stream_tags=DURATION-eng",
+            "-show_entries",
+            "stream=field_order",
             "-of",
             "default=nw=1",
             str(self.input_path),
@@ -49,7 +57,7 @@ class FFmpegClient:
         video_result = subprocess.run(video_command, capture_output=True, text=True)
         assert video_result.stdout is not None
         video_duration_match = re.search(
-            "^TAG:DURATION-eng=(\\d{2}):(\\d{2}):(\\d{2}.\\d+)$", video_result.stdout.rstrip("\n")
+            "TAG:DURATION-eng=(\\d{2}):(\\d{2}):(\\d{2}.\\d+)", video_result.stdout
         )
         assert video_duration_match is not None
         hours, minutes, seconds = video_duration_match.group(1, 2, 3)
@@ -71,9 +79,19 @@ class FFmpegClient:
         audio_duration += int(minutes) * 60
         audio_duration += float(seconds)
 
-        return max([video_duration, audio_duration])
+        field_order_match = re.search(r"field_order=([a-z]+)", video_result.stdout)
+        assert field_order_match is not None
+        field_order = field_order_match.group(1)
 
-    def start_compress_mkv(self, output: Path, overwrite: bool = False):
+        return {"duration": max([video_duration, audio_duration]), "field_order": field_order}
+
+    def start_compress_mkv(
+        self,
+        output_path: Path,
+        overwrite: bool = False,
+        deinterlace: bool = True,
+        verbose: bool = False,
+    ):
         """
         Starts ffmpeg with the h264 and AAC codecs for the first video stream and first audio stream.
         Re-containerizes to MP4 and ensures consistency across inputs.
@@ -109,11 +127,21 @@ class FFmpegClient:
         command.extend(
             ["-movflags", "+faststart", "-fflags", "+genpts", "-avoid_negative_ts", "make_zero"]
         )
+
+        deinterlace_filter = "yadif"
         if self.source_type == "DVD":
-            command.extend(
-                ["-vf", "scale=trunc(480*dar/2)*2:480:flags=lanczos,setsar=1,setfield=prog"]
-            )
-        command.append(str(output))
+            scale_filter = "scale=trunc(480*dar/2)*2:480:flags=lanczos,setsar=1,setfield=prog"
+            if deinterlace:
+                command.extend(["-vf", f"{deinterlace_filter},{scale_filter}"])
+            else:
+                command.extend(["-vf", scale_filter])
+        elif deinterlace:
+            command.extend(["-vf", deinterlace_filter])
+
+        command.append(str(output_path))
+
+        if verbose:
+            console.print(Text(" ".join(command)))
 
         ffmpeg_proc = subprocess.Popen(
             command,

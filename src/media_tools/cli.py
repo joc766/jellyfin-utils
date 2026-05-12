@@ -63,6 +63,7 @@ def rip_disk_cmd(
 @click.option("--output_dir", "output_dir", type=click.Path(path_type=Path))
 @click.option("--output_filename", "output_filename", type=str)
 @click.option("--container", "-c", "container", type=str, default="mp4")
+@click.option("--verbose", "-v", is_flag=True)
 @click.argument("input_path", type=click.Path(path_type=Path))
 def compress_mkv_cmd(
     input_path: Path,
@@ -73,6 +74,7 @@ def compress_mkv_cmd(
     output: Path | None = None,
     output_dir: Path | None = None,
     output_filename: str | None = None,
+    verbose: bool = False,
 ):
     try:
         compress_mkv(
@@ -84,7 +86,10 @@ def compress_mkv_cmd(
             output_filename=output_filename,
             output_container=container,
             overwrite=overwrite,
+            verbose=verbose,
         )
+    except AssertionError as e:
+        raise e
     except Exception as e:
         raise click.ClickException(str(e)) from e
 

@@ -1,3 +1,4 @@
+from os import sync
 from pathlib import Path
 
 import click
@@ -7,8 +8,10 @@ from rich import get_console
 from .ffmpeg_tool import compress_mkv
 from .makemkv_tool import rip_disk
 from .omdb_tool import MissingCredentialsError, rename_movie
+from .rsync_tool import interactive_sync
 
 load_dotenv("/Users/linkit/Projects/gh/jellyfin-utils/.env", override=False)
+
 console = get_console()
 
 
@@ -73,6 +76,16 @@ def compress_mkv_cmd(
         )
     except Exception as e:
         raise click.ClickException(str(e)) from e
+
+
+@cli.command("push")
+@click.option("--movie", "content_type", flag_value="movie", default=True, type=str)
+@click.option("--tv", "content_type", flag_value="tv", type=str)
+@click.option("--compressed", "content_format", flag_value="compressed", default=True)
+@click.option("--raw", "content_format", flag_value="raw")
+def sync_to_server(content_type: str, content_format: str):
+    # TODO: add part where we prompt the user for options to upload based on content_type and content_format
+    interactive_sync(content_type, content_format)
 
 
 def main():

@@ -32,6 +32,7 @@ def make_output_path(
     return output_path
 
 
+# TODO: add dry-run parameter for easier testing and planning
 def compress_mkv(
     input_path: Path,
     source_type: str = "DVD",

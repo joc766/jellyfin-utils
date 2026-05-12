@@ -88,6 +88,7 @@ def sync_to_server(
     dry_run: bool = False,
     verbose: bool = False,
 ):
+    # TODO: add docstring + consider if dest_path should be a Path or str
     if not src.exists():
         raise FileNotFoundError(f"src: file or directory {src} does not exist")
     if src.is_file():
@@ -111,6 +112,7 @@ def sync_to_server(
             progress.stop_progress()
 
 
+# TODO: rename tv to "shows"?
 def interactive_sync(content_type: str = "movie", content_format: str = "compressed"):
     content_to_sync = get_list_of_files(content_type=content_type, content_format=content_format)
     table = Table(

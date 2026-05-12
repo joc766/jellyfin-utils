@@ -13,6 +13,8 @@ RAW_STORAGE_BASE = STORAGE_BASE / "raw"
 
 console = get_console()
 
+
+# TODO maybe move this into the client?
 def check_existing_mkvs(output_path):
     # Handle existing MKVs in output path
     if not output_path.exists():
@@ -29,9 +31,9 @@ def check_existing_mkvs(output_path):
     return
 
 
-# TODO: improve title selection so you can see all titles
-# instead of one at a time
-# TODO: make more testable with mock data for the mkv ripping step
+# TODO: improve title selection so you can see all titles instead of one at a time
+# TODO: add dry run option for easier testing
+# TODO: Handle cleaning file names to proper directory names
 def rip_disk(
     content_type: str = "DVD",
     output_base: Path | None = None,

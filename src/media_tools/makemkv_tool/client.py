@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 
 
+# TODO: verify/add support for non-disk drives to allow testing with backed-up data
 class MakeMKVClient:
     def __init__(self, executable: str = "makemkvcon"):
         self.executable = executable

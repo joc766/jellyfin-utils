@@ -10,9 +10,18 @@ from .makemkv_tool import rip_disk
 from .omdb_tool import MissingCredentialsError, rename_movie
 from .rsync_tool import interactive_sync
 
+# TODO: re-examine the behavior of load_dotenv, may want to replace it with a proper configuration system
 load_dotenv("/Users/linkit/Projects/gh/jellyfin-utils/.env", override=False)
 
 console = get_console()
+
+# TODO: add a setup command to create a config with
+# info like the base dir for everyting and the target server
+# TODO: Add organize_files functionality
+# TODO: implement OMDB API calls
+# TODO: delete files after successful sync to server?
+# TODO: command that shows files in your compressed/raw base dirs that are not on the server
+# TODO: command to eject disk tray (with default /dev/disk6)
 
 
 @click.group()

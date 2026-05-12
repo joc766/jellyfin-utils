@@ -27,9 +27,13 @@ if [[ $INPUT =~ /$ ]]; then
   exit 1
 fi
 
-REMOTE_DEST="jackoconnor@192.168.50.2:'/mnt/storage/jellyfin/movies/'"
+REMOTE_DEST="jackoconnor@192.168.50.2:/mnt/storage/jellyfin/movies/"
 
-rsync -rltDvhW --delete --partial ${DRY_RUN_ARG:+$DRY_RUN_ARG} --progress --stats --exclude '.DS_Store' \
+# -r: recursive (copy subdirs), -t: preserve timestamps, -D: copy special file types, -v: verbose, -h: human readable sizes, -W: whole file method, faster
+# --partial: do not delete partial uploads (for failure)
+# --stats: show verbose stats at the end
+# --progress: periodically report progress
+rsync -rtvhW --delete --partial ${DRY_RUN_ARG:+$DRY_RUN_ARG} --progress --stats --exclude '.DS_Store' \
   -e "ssh -T -c aes128-gcm@openssh.com -o Compression=no -o ServerAliveInterval=30 -o ServerAliveCountMax=6" \
   --rsync-path='sudo -n rsync' \
   --chmod=Du=rwx,Dg=rx,Do=rx,Fu=rw,Fg=r,Fo=r \

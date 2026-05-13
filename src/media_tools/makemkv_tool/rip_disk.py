@@ -91,6 +91,7 @@ def rip_disk(
             Choice(title.title_id, name=f"{title.title_name} (duration: {title.duration})")
             for title in titles
         ],
+        vi_mode=True,
         transformer=lambda result: f"{len(result)} title{'s' if len(result) > 1 else ''} selected",
     ).execute()
     titles_to_rip: list[MakeMKVTitleInfo] = [

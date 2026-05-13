@@ -140,6 +140,7 @@ def interactive_sync(content_type: str = "movie", content_format: str = "compres
         message="Select titles to sync",
         choices=list(content_to_sync.keys()),
         instruction="Use space to select, enter to confirm.",
+        vi_mode=True
     ).execute()
 
     for folder_name in selected:

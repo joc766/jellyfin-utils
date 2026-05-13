@@ -1,7 +1,12 @@
 import os
 from pathlib import Path
 
+from InquirerPy.prompts.rawlist import RawlistPrompt
+from InquirerPy.prompts.input import InputPrompt
+from InquirerPy.base.control import Choice
 import requests
+
+
 
 OMDB_BASE_URL = "https://omdbapi.com"
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")
@@ -32,19 +37,47 @@ def get_title(imdb_id: str) -> str:
     else:
         raise KeyError("Title name could not be produced.")
 
+def format_size(size_bytes: float) -> str | None:
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024
 
-def rename_movie(movie_path: Path, imdb_id: str) -> Path:
+def rename_movie(movie_path: Path, imdb_id: str) -> None:
     if not movie_path.exists():
         raise FileNotFoundError(f"{movie_path} does not exist")
-    if not movie_path.is_file():
-        raise ValueError("[movie_path] must be a file, not a directory")
 
-    parent_path = movie_path.parent
     title = get_title(imdb_id)
-    new_movie_file_name = f"{title}{movie_path.suffix}"
-    os.rename(movie_path, parent_path / new_movie_file_name)
-    new_parent_path = parent_path.parent / title
-    os.rename(parent_path, new_parent_path)
+    if movie_path.is_dir():
+        content_choices = ["main feature", "extra", "trailer"]
+        for file in movie_path.iterdir():
+            file_size = format_size(file.stat().st_size)
+            assert file_size is not None
+            selected = RawlistPrompt(
+                message=f"Select content type for {file.name} ({file_size})",
+                choices=content_choices,
+                vi_mode=True,
+                transformer=lambda result: f"{result}"
+            ).execute()
+            if selected == "main feature":
+                os.rename(file, file.parent / f"{title}{file.suffix}")
+            elif selected == "extra":
+                extra_name = InputPrompt(
+                    message="Enter title for extra: ",
+                    vi_mode=True
+                ).execute()
+                (file.parent / "extras").mkdir(exist_ok=True)
+                os.rename(file, file.parent / "extras" / f"{extra_name}{file.suffix}")
+            elif selected == "trailer":
+                os.rename(file, file.parent / f"trailer{file.suffix}")
+        os.rename(movie_path, movie_path.parent / title)
 
-    new_title = new_parent_path / new_movie_file_name
-    return new_title
+    else:
+        parent_path = movie_path.parent
+        new_movie_file_name = f"{title}{movie_path.suffix}"
+        os.rename(movie_path, parent_path / new_movie_file_name)
+        new_parent_path = parent_path.parent / title
+        os.rename(parent_path, new_parent_path)
+
+        new_title = new_parent_path / new_movie_file_name
+

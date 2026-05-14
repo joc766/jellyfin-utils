@@ -124,6 +124,7 @@ class FFmpegClient:
         )
         command.extend(["-maxrate", "20M", "-bufsize", "20M", "-x264-params", "interlaced=0"])
         command.extend(["-c:a", "libfdk_aac", "-ac", "2", "-ab", "256k"])
+        command.extend(["-af", "acompressor=threshold=-20dB:ratio=3,loudnorm=I=-16:TP=-1.5:LRA=10"])
         command.extend(
             ["-movflags", "+faststart", "-fflags", "+genpts", "-avoid_negative_ts", "make_zero"]
         )

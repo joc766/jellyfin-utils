@@ -9,14 +9,16 @@ from rich.table import Table
 from rich.text import Text
 
 from .client import RsyncClient
+from .models import ContentFormat, ContentType, RsyncLocation, TransferDirection
 from .progress import RsyncProgressTracker
 
 console = get_console()
 
 STORAGE_BASE = Path(os.getenv("STORAGE_BASE", "/Volumes/SanDisk"))
 
-JELLYFIN_BASENAME = os.getenv("JELLYFIN_BASENAME", "/mnt/storage/jellyfin/")
-JELLYFIN_SERVERNAME = os.getenv("JELLYFIN_SERVERNAME", "jackoconnor@192.168.50.2")
+JELLYFIN_BASE = Path(os.getenv("JELLYFIN_BASENAME", "/mnt/storage/jellyfin/"))
+JELLYFIN_HOST = os.getenv("JELLYFIN_SERVERNAME", "192.168.50.2")
+JELLYFIN_USER = os.getenv("JELLYFIN_USERNAME", "jackoconnor")
 
 INTRO_MSG_PATTERN = re.compile(r"^sending incremental file list$")
 SENT_MSG_PATTERN = re.compile(r"^sent .* bytes  received .* bytes .* bytes/sec$")
@@ -35,17 +37,24 @@ CHANGES = {
 
 
 def get_list_of_files(
-    content_type: str = "movie", content_format: str = "compressed"
+    direction: TransferDirection, content_type: ContentType, content_format: ContentFormat
 ) -> dict[str, dict]:
-    src_path = STORAGE_BASE / content_format / content_type
-    dest_path = JELLYFIN_BASENAME + f"{content_format}/" + f"{content_type}/"
-    dest_server = JELLYFIN_SERVERNAME
+    src_base = STORAGE_BASE if direction == "upload" else JELLYFIN_BASE
+    src_path = src_base / content_format / content_type
+    src_host = None if direction == "upload" else JELLYFIN_HOST
+    src_user = None if direction == "upload" else JELLYFIN_USER
+    src = RsyncLocation(src_path, host=src_host, user=src_user)
+
+    dest_base = JELLYFIN_BASE if direction == "upload" else STORAGE_BASE
+    dest_path = dest_base / content_format / content_type
+    dest_host = JELLYFIN_HOST if direction == "upload" else None
+    dest_user = JELLYFIN_USER if direction == "upload" else None
+    dest = RsyncLocation(dest_path, host=dest_host, user=dest_user)
+
     client = RsyncClient()
 
     content_to_sync = defaultdict(dict)
-    for line in client.start_rsync(
-        src_path, dest_server, dest_path, contents_only=True, dry_run=True
-    ):
+    for line in client.start_rsync(src, dest, contents_only=True, dry_run=True):
         if (
             not INTRO_MSG_PATTERN.match(line)
             and not SENT_MSG_PATTERN.match(line)
@@ -80,30 +89,36 @@ def get_list_of_files(
     return content_to_sync
 
 
-def sync_to_server(
-    src: Path,
-    dest_server: str = JELLYFIN_SERVERNAME,
+def sync_with_server(
+    direction: TransferDirection,
+    title_name: str,
     content_type: str = "movie",
     content_format: str = "compressed",
     dry_run: bool = False,
     verbose: bool = False,
 ):
-    # TODO: add docstring + consider if dest_path should be a Path or str
-    if not src.exists():
-        raise FileNotFoundError(f"src: file or directory {src} does not exist")
-    if src.is_file():
-        title_name = src.name
-    else:
-        title_name = src.stem
+    """Uploads/Downloads a title folder to/from the jellyfin server"""
+
+    src_base = STORAGE_BASE if direction == "upload" else JELLYFIN_BASE
+    src_path = src_base / content_format / content_type / title_name
+    src_host = None if direction == "upload" else JELLYFIN_HOST
+    src_user = None if direction == "upload" else JELLYFIN_USER
+    src = RsyncLocation(src_path, host=src_host, user=src_user)
+
+    dest_base = JELLYFIN_BASE if direction == "upload" else STORAGE_BASE
+    dest_path = dest_base / content_format / content_type
+    dest_host = JELLYFIN_HOST if direction == "upload" else None
+    dest_user = JELLYFIN_USER if direction == "upload" else None
+    dest = RsyncLocation(dest_path, host=dest_host, user=dest_user)
+
+    if src.host is None and not src.path.exists():
+        raise FileNotFoundError(f"src: file or directory {src.path} does not exist")
+
     client = RsyncClient()
     progress = RsyncProgressTracker(title_name=title_name)
 
-    dest_path = JELLYFIN_BASENAME + f"{content_format}/" + f"{content_type}/"
-
     try:
-        for line in client.start_rsync(
-            src, dest_server, dest_path, dry_run=dry_run, contents_only=False
-        ):
+        for line in client.start_rsync(src, dest, dry_run=dry_run, contents_only=False):
             if verbose:
                 print(repr(line))
             progress.handle_line(line)
@@ -112,9 +127,12 @@ def sync_to_server(
             progress.stop_progress()
 
 
-# TODO: rename tv to "shows"?
-def interactive_sync(content_type: str = "movie", content_format: str = "compressed"):
-    content_to_sync = get_list_of_files(content_type=content_type, content_format=content_format)
+def interactive_sync(
+    direction: TransferDirection, content_type: ContentType, content_format: ContentFormat
+):
+    content_to_sync = get_list_of_files(
+        direction, content_type=content_type, content_format=content_format
+    )
     table = Table(
         title=f"{content_format.capitalize()} {content_type.capitalize()}s found in src not on server",
         show_lines=True,
@@ -140,13 +158,13 @@ def interactive_sync(content_type: str = "movie", content_format: str = "compres
         message="Select titles to sync",
         choices=list(content_to_sync.keys()),
         instruction="Use space to select, enter to confirm.",
-        vi_mode=True
+        vi_mode=True,
     ).execute()
 
     for folder_name in selected:
-        src_path = STORAGE_BASE / content_format / content_type / folder_name
-        sync_to_server(
-            src_path,
+        sync_with_server(
+            direction,
+            folder_name,
             content_type=content_type,
             content_format=content_format,
         )

@@ -1,9 +1,10 @@
-from os import sync
 from pathlib import Path
 
 import click
 from dotenv import load_dotenv
 from rich import get_console
+
+from media_tools.rsync_tool.models import ContentFormat, ContentType
 
 from .ffmpeg_tool import compress_mkv
 from .makemkv_tool import rip_disk
@@ -94,14 +95,24 @@ def compress_mkv_cmd(
         raise click.ClickException(str(e)) from e
 
 
-@cli.command("push")
+@cli.command("upload")
 @click.option("--movie", "content_type", flag_value="movie", default=True, type=str)
-@click.option("--tv", "content_type", flag_value="tv", type=str)
-@click.option("--compressed", "content_format", flag_value="compressed", default=True)
-@click.option("--raw", "content_format", flag_value="raw")
-def sync_to_server(content_type: str, content_format: str):
+@click.option("--show", "content_type", flag_value="show", type=str)
+@click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
+@click.option("--raw", "content_format", flag_value="raw", type=str)
+def upload_to_server(content_type: ContentType, content_format: ContentFormat):
     # TODO: add part where we prompt the user for options to upload based on content_type and content_format
-    interactive_sync(content_type, content_format)
+    interactive_sync("upload", content_type, content_format)
+
+
+@cli.command("download")
+@click.option("--movie", "content_type", flag_value="movie", default=True, type=str)
+@click.option("--show", "content_type", flag_value="show", type=str)
+@click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
+@click.option("--raw", "content_format", flag_value="raw", type=str)
+def download_from_server(content_type: ContentType, content_format: ContentFormat):
+    # TODO: add part where we prompt the user for options to upload based on content_type and content_format
+    interactive_sync("download", content_type, content_format)
 
 
 def main():

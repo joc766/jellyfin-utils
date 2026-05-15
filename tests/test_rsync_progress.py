@@ -8,7 +8,7 @@ client = RsyncClient()
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
-def test_sync_to_server(slow: bool = False):
+def test_rsync_progress(slow: bool = False):
     client = RsyncClient()
     progress = RsyncProgressTracker()
 

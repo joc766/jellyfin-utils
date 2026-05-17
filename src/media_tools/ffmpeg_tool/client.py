@@ -104,7 +104,17 @@ class FFmpegClient:
         command.extend(["-nostdin", "-progress", "pipe:1", "-nostats"])
         command.extend(["-i", str(self.input_path)])
         command.extend(
-            ["-map_metadata", "0", "-map_chapters", "0", "-map", "0:v:0", "-map", "0:a:0", "-sn"]
+            [
+                "-map_metadata",
+                "0",
+                "-map_chapters",
+                "0",
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a:m:language:eng",
+                "-sn",
+            ]
         )
         command.extend(
             [

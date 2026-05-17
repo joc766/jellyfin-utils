@@ -116,6 +116,7 @@ def sync_with_server(
 
     client = RsyncClient()
     progress = RsyncProgressTracker(title_name=title_name)
+    progress.initialize()
 
     try:
         for line in client.start_rsync(src, dest, dry_run=dry_run, contents_only=False):
@@ -128,7 +129,10 @@ def sync_with_server(
 
 
 def interactive_sync(
-    direction: TransferDirection, content_type: ContentType, content_format: ContentFormat
+    direction: TransferDirection,
+    content_type: ContentType,
+    content_format: ContentFormat,
+    verbose: bool = False,
 ):
     content_to_sync = get_list_of_files(
         direction, content_type=content_type, content_format=content_format
@@ -167,4 +171,5 @@ def interactive_sync(
             folder_name,
             content_type=content_type,
             content_format=content_format,
+            verbose=verbose,
         )

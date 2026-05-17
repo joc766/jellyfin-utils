@@ -34,7 +34,7 @@ class RsyncClient:
     ):
         rsync_cmd = self.generate_command(src, dest, contents_only=contents_only, dry_run=dry_run)
         rsync_proc = subprocess.Popen(
-            rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0, text=False
+            rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0, text=False
         )
 
         assert rsync_proc.stdout is not None

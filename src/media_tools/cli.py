@@ -100,9 +100,10 @@ def compress_mkv_cmd(
 @click.option("--show", "content_type", flag_value="show", type=str)
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
-def upload_to_server(content_type: ContentType, content_format: ContentFormat):
+@click.option("--verbose", "-v", "verbose", is_flag=True)
+def upload_to_server(content_type: ContentType, content_format: ContentFormat, verbose: bool):
     # TODO: add part where we prompt the user for options to upload based on content_type and content_format
-    interactive_sync("upload", content_type, content_format)
+    interactive_sync("upload", content_type, content_format, verbose=verbose)
 
 
 @cli.command("download")
@@ -110,9 +111,12 @@ def upload_to_server(content_type: ContentType, content_format: ContentFormat):
 @click.option("--show", "content_type", flag_value="show", type=str)
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
-def download_from_server(content_type: ContentType, content_format: ContentFormat):
+@click.option("--verbose", "-v", "verbose", is_flag=True)
+def download_from_server(
+    content_type: ContentType, content_format: ContentFormat, verbose: bool = False
+):
     # TODO: add part where we prompt the user for options to upload based on content_type and content_format
-    interactive_sync("download", content_type, content_format)
+    interactive_sync("download", content_type, content_format, verbose=verbose)
 
 
 def main():

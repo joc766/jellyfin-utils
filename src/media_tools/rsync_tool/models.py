@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, NamedTuple
+
+
+class RsyncChangeInfo:
+    description: str
+    size: str
 
 
 @dataclass
@@ -18,6 +23,11 @@ class RsyncLocation:
         prefix = f"{self.user}@{self.host}" if self.user else self.host
 
         return f"{prefix}:{path}"
+
+
+class RsyncSources(NamedTuple):
+    src: RsyncLocation
+    dest: RsyncLocation
 
 
 TransferDirection = Literal["upload", "download"]

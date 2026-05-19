@@ -1,33 +1,60 @@
+import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import click
 from dotenv import load_dotenv
-from rich import get_console
+from rich.console import Console
 
 from media_tools.rsync_tool.models import ContentFormat, ContentType
 
 from .ffmpeg_tool import compress_mkv
 from .makemkv_tool import rip_disk
 from .omdb_tool import MissingCredentialsError, rename_movie
-from .rsync_tool import interactive_sync
-
-# TODO: re-examine the behavior of load_dotenv, may want to replace it with a proper configuration system
-load_dotenv("/Users/linkit/Projects/gh/jellyfin-utils/.env", override=False)
-
-console = get_console()
+from .rsync_tool import RsyncClient, interactive_sync
 
 # TODO: add a setup command to create a config with
 # info like the base dir for everyting and the target server
-# TODO: Add organize_files functionality
-# TODO: implement OMDB API calls
-# TODO: delete files after successful sync to server?
-# TODO: command that shows files in your compressed/raw base dirs that are not on the server
 # TODO: command to eject disk tray (with default /dev/disk6)
 
 
+@dataclass(frozen=True)
+class AppConfig:
+    jellyfin_base: Path
+    jellyfin_host: str
+    jellyfin_user: str
+    local_base: Path
+
+
+@dataclass(frozen=True)
+class AppContext:
+    config: AppConfig
+    console: Console
+
+
+def require_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
+
+def load_config(dotenv_path: Path | None = None) -> AppConfig:
+    load_dotenv(dotenv_path)
+
+    return AppConfig(
+        local_base=Path(require_env("LOCAL_BASE")),
+        jellyfin_base=Path(require_env("JELLYFIN_BASE")),
+        jellyfin_user=require_env("JELLYFIN_USER"),
+        jellyfin_host=require_env("JELLYFIN_HOST"),
+    )
+
+
 @click.group()
-def cli():
-    pass
+@click.pass_context
+def cli(ctx: click.Context):
+    config = load_config(Path(__file__).parent.parent.parent / ".env")
+    ctx.obj = AppContext(config=config, console=Console())
 
 
 @cli.command("organize")
@@ -101,9 +128,18 @@ def compress_mkv_cmd(
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
-def upload_to_server(content_type: ContentType, content_format: ContentFormat, verbose: bool):
-    # TODO: add part where we prompt the user for options to upload based on content_type and content_format
-    interactive_sync("upload", content_type, content_format, verbose=verbose)
+@click.pass_obj
+def upload_to_server(
+    app_ctx: AppContext, content_type: ContentType, content_format: ContentFormat, verbose: bool
+):
+    client = RsyncClient.from_config(
+        app_ctx.config,
+        console=app_ctx.console,
+        direction="upload",
+        content_format=content_format,
+        content_type=content_type,
+    )
+    interactive_sync(client, verbose=verbose)
 
 
 @cli.command("download")
@@ -112,11 +148,23 @@ def upload_to_server(content_type: ContentType, content_format: ContentFormat, v
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
+@click.option("--debug", "debug", is_flag=True)
+@click.pass_obj
 def download_from_server(
-    content_type: ContentType, content_format: ContentFormat, verbose: bool = False
+    app_ctx: AppContext,
+    content_type: ContentType,
+    content_format: ContentFormat,
+    verbose: bool = False,
+    debug: bool = False,
 ):
-    # TODO: add part where we prompt the user for options to upload based on content_type and content_format
-    interactive_sync("download", content_type, content_format, verbose=verbose)
+    client = RsyncClient.from_config(
+        app_ctx.config,
+        console=app_ctx.console,
+        direction="download",
+        content_format=content_format,
+        content_type=content_type,
+    )
+    interactive_sync(client, verbose=verbose, debug=debug)
 
 
 def main():

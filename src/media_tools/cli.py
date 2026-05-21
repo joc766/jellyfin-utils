@@ -7,17 +7,20 @@ from dotenv import load_dotenv
 from InquirerPy.base.control import Choice
 from InquirerPy.prompts.list import ListPrompt
 from rich.console import Console
+from rich.table import Table
 
 from media_tools.rsync_tool.models import ContentFormat, ContentType
 
 from .ffmpeg_tool import compress_mkv
 from .makemkv_tool import rip_disk
 from .omdb_tool import OmdbClient
+from .other import find_missing_compressed_movies, find_missing_raw_movies
 from .rsync_tool import RsyncClient, interactive_sync
 
 # TODO: add a setup command to create a config with
 # info like the base dir for everyting and the target server
 # TODO: command to eject disk tray (with default /dev/disk6)
+# TODO: add command to safely delete from local_base when jellyfin_base has src
 
 
 @dataclass(frozen=True)
@@ -192,6 +195,36 @@ def download_from_server(
         content_type=content_type,
     )
     interactive_sync(client, verbose=verbose, debug=debug)
+
+
+@cli.command("find-missing-raw")
+@click.pass_obj
+def find_missing_raw(app_ctx: AppContext):
+    console = app_ctx.console
+    missing_table = Table(title="Compressed movies with no raw backup on server")
+    missing_table.add_column("movie_name")
+    for movie_name in sorted(
+        find_missing_raw_movies(
+            app_ctx.config.jellyfin_host, app_ctx.config.jellyfin_user, app_ctx.config.jellyfin_base
+        )
+    ):
+        missing_table.add_row(movie_name)
+    console.print(missing_table)
+
+
+@cli.command("find-missing-compressed")
+@click.pass_obj
+def find_missing_compressed(app_ctx: AppContext):
+    console = app_ctx.console
+    missing_table = Table(title="Raw movies with no compressed version on server")
+    missing_table.add_column("movie_name")
+    for movie_name in sorted(
+        find_missing_compressed_movies(
+            app_ctx.config.jellyfin_host, app_ctx.config.jellyfin_user, app_ctx.config.jellyfin_base
+        )
+    ):
+        missing_table.add_row(movie_name)
+    console.print(missing_table)
 
 
 def main():

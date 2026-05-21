@@ -12,13 +12,12 @@ from rich.table import Table
 from media_tools.rsync_tool.models import ContentFormat, ContentType
 
 from .ffmpeg_tool import compress_mkv
-from .makemkv_tool import rip_disk
+from .makemkv_tool import MakeMKVClient, rip_disk
 from .omdb_tool import OmdbClient
 from .other import find_missing_compressed_movies, find_missing_raw_movies
 from .rsync_tool import RsyncClient, interactive_sync
 
 # TODO: add a setup command to create a config with
-# info like the base dir for everyting and the target server
 # TODO: command to eject disk tray (with default /dev/disk6)
 # TODO: add command to safely delete from local_base when jellyfin_base has src
 
@@ -100,15 +99,20 @@ def organize_cmd(app_ctx: AppContext, imdb_id: str, content_type: str):
 
 
 @cli.command("rip")
-@click.option("--tv", "content_type", flag_value="tv")
-@click.option("--movie", "content_type", flag_value="movie", default=True)
 @click.option("--verbose", "-v", is_flag=True)
-@click.option("--output_base", "-o", "output_base", type=click.Path(path_type=Path))
-@click.option("--overwrite", is_flag=True, default=False)
+@click.option("--movie", "content_type", flag_value="movie", default=True)
+@click.option("--tv", "content_type", flag_value="tv")
+@click.option("--debug", "debug", is_flag=True)
+@click.pass_obj
 def rip_disk_cmd(
-    output_base: Path, content_type: str, verbose: bool = False, overwrite: bool = False
+    app_ctx: AppContext, content_type: ContentType, verbose: bool = False, debug: bool = False
 ):
-    rip_disk(content_type, output_base=output_base, verbose=verbose, overwrite=overwrite)
+    try:
+        output_base = app_ctx.config.local_base / "raw" / content_type
+        client = MakeMKVClient(output_base=output_base, console=app_ctx.console)
+        rip_disk(client, verbose=verbose, debug=debug)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
 @cli.command("compress")

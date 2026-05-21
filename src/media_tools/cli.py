@@ -4,13 +4,15 @@ from pathlib import Path
 
 import click
 from dotenv import load_dotenv
+from InquirerPy.base.control import Choice
+from InquirerPy.prompts.list import ListPrompt
 from rich.console import Console
 
 from media_tools.rsync_tool.models import ContentFormat, ContentType
 
 from .ffmpeg_tool import compress_mkv
 from .makemkv_tool import rip_disk
-from .omdb_tool import MissingCredentialsError, rename_movie
+from .omdb_tool import OmdbClient
 from .rsync_tool import RsyncClient, interactive_sync
 
 # TODO: add a setup command to create a config with
@@ -24,6 +26,7 @@ class AppConfig:
     jellyfin_host: str
     jellyfin_user: str
     local_base: Path
+    omdb_api_key: str
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,7 @@ def load_config(dotenv_path: Path | None = None) -> AppConfig:
         jellyfin_base=Path(require_env("JELLYFIN_BASE")),
         jellyfin_user=require_env("JELLYFIN_USER"),
         jellyfin_host=require_env("JELLYFIN_HOST"),
+        omdb_api_key=require_env("OMDB_API_KEY"),
     )
 
 
@@ -66,13 +70,28 @@ def cli(ctx: click.Context, env_file: Path | None = None):
 
 
 @cli.command("organize")
-@click.argument("path", type=click.Path(path_type=Path))
+@click.option("--movie", "content_type", flag_value="movie", default=True)
+@click.option("--show", "content_type", flag_value="show")
 @click.argument("imdb_id", type=str)
-def organize_cmd(path: Path, imdb_id: str):
+@click.pass_obj
+def organize_cmd(app_ctx: AppContext, imdb_id: str, content_type: str):
+    client = OmdbClient(app_ctx.config.omdb_api_key)
+    title = client.get_title(imdb_id)
+    console = app_ctx.console
+    content_base = app_ctx.config.local_base / "raw" / content_type
+    folder_choices = [
+        Choice(value=folder, name=folder.stem)
+        for folder in content_base.iterdir()
+        if folder.is_dir()
+    ]
+    path = ListPrompt(
+        f"Select the folder for {title}",
+        choices=folder_choices,
+        vi_mode=True,
+    ).execute()
+    console.print(f"mv '{path}' '{path.parent / title}'")
     try:
-        rename_movie(path, imdb_id)
-    except MissingCredentialsError as e:
-        raise click.ClickException(str(e)) from e
+        client.rename_movie(path, imdb_id)
     except Exception as e:
         raise click.ClickException(str(e)) from e
 

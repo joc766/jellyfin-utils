@@ -52,8 +52,16 @@ def load_config(dotenv_path: Path | None = None) -> AppConfig:
 
 @click.group()
 @click.pass_context
-def cli(ctx: click.Context):
-    config = load_config(Path(__file__).parent.parent.parent / ".env")
+@click.option("--env-file", "env_file", type=click.Path(path_type=Path))
+def cli(ctx: click.Context, env_file: Path | None = None):
+    if not env_file:
+        home_dir = Path(require_env("HOME"))
+        env_path = home_dir / ".config" / "media-tools" / ".env"
+    else:
+        env_path = env_file
+    if not env_path.is_file():
+        raise click.ClickException(f"No .env file found in {str(env_path.parent)}")
+    config = load_config(env_path)
     ctx.obj = AppContext(config=config, console=Console())
 
 

@@ -46,9 +46,9 @@ class RsyncProgressTracker:
     )
 
     def __init__(
-        self, title_name: str | None = None, transfer_direction: TransferDirection = "upload"
+        self, title_name: str | None = None, direction: TransferDirection = "upload"
     ) -> None:
-        self.transfer_direction = transfer_direction
+        self.direction: TransferDirection = direction
         self.initiated = False
         self.started = False
         self.stopped = False
@@ -71,7 +71,9 @@ class RsyncProgressTracker:
         if self.title_name is None:
             self.description = "Syncing files with rsync"
         else:
-            self.description = f"{self.transfer_direction.capitalize()}ing [italic cyan]{self.title_name}[/italic cyan]..."
+            self.description = (
+                f"{self.direction.capitalize()}ing [italic cyan]{self.title_name}[/italic cyan]"
+            )
 
         self.initialize_progress = Progress(
             SpinnerColumn(), TextColumn("[bold green]{task.description}")
@@ -142,7 +144,7 @@ class RsyncProgressTracker:
             self.transfer_progress.update(
                 self.task_id,
                 completed=percent_completed,
-                description=f"[green]Syncing {self.description} ({transfer_number} complete, {remaining_transfers} remain)",
+                description=f"[green]{self.description} ({transfer_number} complete, {remaining_transfers} remain)",
             )
             if remaining_transfers == 0:
                 if not self.finalizing:

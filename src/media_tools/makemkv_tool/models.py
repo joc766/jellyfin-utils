@@ -1,4 +1,7 @@
 from dataclasses import dataclass, field
+from typing import Literal
+
+DiscType = Literal["BD", "DVD"]
 
 
 @dataclass
@@ -66,8 +69,9 @@ class MakeMKVTitleInfo:
 
 @dataclass
 class MakeMKVDiscInfo:
+    drive_name: str = ""
     disc_title: str = ""
-    disc_type: str = ""
+    disc_type: DiscType | None = None
     titles: dict[int, MakeMKVTitleInfo] = field(default_factory=dict)
 
 

@@ -8,11 +8,14 @@ from rich.progress import (
     ProgressColumn,
     SpinnerColumn,
     Task,
+    TaskProgressColumn,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
 from rich.text import Text
+
+from .models import TransferDirection
 
 # TODO: add console
 
@@ -27,25 +30,39 @@ class SpeedColumn(ProgressColumn):
         return Text(f"{speed}", style="green")
 
 
+class RsyncProgress(Progress):
+    def get_renderables(self):
+        for task in self.tasks:
+            if task.visible:
+                yield Text.from_markup(str(task.description), style="bold green")
+
+        yield self.make_tasks_table(self.tasks)
+
+
 class RsyncProgressTracker:
     progress_pattern = re.compile(r"^\r\s+(\d+.\d+[KMGB])\s+(\d+)%\s+(.*/s)\s+(\d+:\d+:\d+)\s+$")
     progress_with_chk_pattern = re.compile(
         r"^\r\s+(\d+.\d+[KMGB])\s+(\d+)%\s+(.*/s)\s+(\d+:\d+:\d+)\s+\(xfr#(\d+), to-chk=(\d+)/\d+\)$"
     )
 
-    def __init__(self, title_name: str | None = None) -> None:
+    def __init__(
+        self, title_name: str | None = None, direction: TransferDirection = "upload"
+    ) -> None:
+        self.direction: TransferDirection = direction
+        self.initiated = False
         self.started = False
         self.stopped = False
         self.task_id = None
         self.finalizing = False
+        self.initializing = False
+        self.initialize_task_id = None
         self.finalize_task_id = None
         self.title_name = title_name
 
-        self.transfer_progress = Progress(
+        self.transfer_progress = RsyncProgress(
             SpinnerColumn(),
-            TextColumn("[bold]{task.description}"),
             BarColumn(),
-            TextColumn("{task.percentage:5.1f}%"),
+            TaskProgressColumn(),
             TimeElapsedColumn(),
             SpeedColumn(),
             TimeRemainingColumn(),
@@ -54,23 +71,38 @@ class RsyncProgressTracker:
         if self.title_name is None:
             self.description = "Syncing files with rsync"
         else:
-            year = None
-            if year_match := re.search(r"(\(.*\))", self.title_name):
-                year = year_match.group(1)
             self.description = (
-                f"Syncing {self.title_name[:10]}...{year if year is not None else ''}"
+                f"{self.direction.capitalize()}ing [italic cyan]{self.title_name}[/italic cyan]"
             )
 
-        self.finalize_progress = Progress(SpinnerColumn(), TextColumn("[bold]{task.description}"))
+        self.initialize_progress = Progress(
+            SpinnerColumn(), TextColumn("[bold green]{task.description}")
+        )
+        self.finalize_progress = Progress(
+            SpinnerColumn(), TextColumn("[bold green]{task.description}")
+        )
 
-        group = Group(self.transfer_progress, self.finalize_progress)
+        group = Group(self.initialize_progress, self.transfer_progress, self.finalize_progress)
 
-        self.live = Live(group, refresh_per_second=10)
+        self.live: Live = Live(group, refresh_per_second=10)
+
+    def initialize(self):
+        self.initializing = True
+        if not self.live.is_started:
+            self.live.start()
+        self.initialize_task_id = self.initialize_progress.add_task(
+            "Waiting for rsync progress...", total=None
+        )
 
     def start_progress(self):
         self.started = True
-        self.live.start()
-        self.task_id = self.transfer_progress.add_task(f"[green]{self.description}", total=100)
+        if not self.live.is_started:
+            self.live.start()
+        if self.initializing and self.initialize_task_id is not None:
+            self.initialize_progress.update(self.initialize_task_id, visible=False)
+            self.initialize_progress.remove_task(self.initialize_task_id)
+            self.initialize_progress.stop()
+        self.task_id = self.transfer_progress.add_task(self.description, total=100)
 
     def stop_progress(self):
         self.stopped = True
@@ -112,7 +144,7 @@ class RsyncProgressTracker:
             self.transfer_progress.update(
                 self.task_id,
                 completed=percent_completed,
-                description=f"[green]Syncing {self.description} ({transfer_number} complete, {remaining_transfers} remain)",
+                description=f"[green]{self.description} ({transfer_number} complete, {remaining_transfers} remain)",
             )
             if remaining_transfers == 0:
                 if not self.finalizing:

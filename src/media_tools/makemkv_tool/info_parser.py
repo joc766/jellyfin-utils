@@ -41,7 +41,7 @@ class MakeMKVInfoBuilder:
                     disc_type = "BD"
                 self.disc_info.disc_type = disc_type
             case "disc_title":
-                self.disc_info.disc_title = event.value
+                self.disc_info.disc_title = re.sub(r"[-./]", "", event.value)
 
     def get_title(self, title_id: int) -> MakeMKVTitleInfo:
         if title_id not in self.disc_info.titles.keys():

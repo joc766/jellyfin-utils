@@ -34,15 +34,16 @@ class MakeMKVProgressTracker:
             TimeRemainingColumn(),
         )
 
-        self.task_codes = set()
-        self.total_task_queue: list[TaskID] = []
-        self.curr_task_queue: list[TaskID] = []
+        self.total_task: TaskID | None = None
+        self.curr_task: TaskID | None = None
 
     def start_progress(self):
+        self.complete_all()
         self.progress.start()
         self.started = True
 
     def stop_progress(self):
+        self.complete_all()
         self.progress.stop()
         self.finished = True
 
@@ -68,7 +69,7 @@ class MakeMKVProgressTracker:
                     print(line)
                 self.handle_line(line)
                 if testing_mode:
-                    sleep(0.1)
+                    sleep(0.01)
 
         finally:
             self.stop_progress()
@@ -100,46 +101,40 @@ class MakeMKVProgressTracker:
     def apply_progress(self, event: ProgEvent):
         match event:
             case ProgTotalEvent():
-                # complete and hide previous total_task if exists and is new
-                if event.code not in self.task_codes:
-                    if len(self.total_task_queue) > 0:
-                        prev_task_id = self.total_task_queue.pop()
-                        self.progress.update(prev_task_id, completed=65536)
-                    # add new total_task
-                    self.task_codes.add(event.code)
-                    self.total_task_queue.append(
-                        self.progress.add_task(f"[green]{event.name}", total=65536)
+                # update total task
+                if self.total_task is not None:
+                    self.progress.reset(
+                        self.total_task,
+                        description=f"[green]{event.name}",
+                        completed=0,
+                        total=65536,
+                        start=True,
                     )
+                else:
+                    self.total_task = self.progress.add_task(f"[green]{event.name}", total=65536)
             case ProgCurrEvent():
                 # complete and hide previous curr_task if exists and is new
-                if event.code not in self.task_codes:
-                    if len(self.curr_task_queue) > 0:
-                        prev_task_id = self.curr_task_queue.pop()
-                        self.progress.update(prev_task_id, completed=65536)
-                    # add new curr_task
-                    self.task_codes.add(event.code)
-                    self.curr_task_queue.append(
-                        self.progress.add_task(f"[blue]{event.name}", total=65536)
+                if self.curr_task is not None:
+                    self.progress.reset(
+                        self.curr_task,
+                        description=f"[blue]{event.name}",
+                        completed=0,
+                        total=65536,
+                        start=True,
+                    )
+                else:
+                    self.curr_task = self.progress.add_task(
+                        f"[blue]{event.name}", total=65536, start=True
                     )
             case ProgValueEvent():
                 # update total progress
-                if len(self.total_task_queue) > 0:
-                    total_task_id = self.total_task_queue[0]
-                    self.progress.update(total_task_id, completed=event.total)
-                    if self.progress.tasks[total_task_id].finished:
-                        self.progress.update(total_task_id)
-                        self.total_task_queue.pop()
-                if len(self.curr_task_queue) > 0:
-                    curr_task_id = self.curr_task_queue[0]
-                    self.progress.update(curr_task_id, completed=event.current)
-                    if self.progress.tasks[curr_task_id].finished:
-                        self.progress.update(curr_task_id)
-                        self.curr_task_queue.pop()
+                if self.total_task is not None:
+                    self.progress.update(self.total_task, completed=event.total)
+                if self.curr_task is not None:
+                    self.progress.update(self.curr_task, completed=event.current)
 
     def complete_all(self):
-        if len(self.curr_task_queue) > 0:
-            curr_task_id = self.curr_task_queue.pop()
-            self.progress.update(curr_task_id, completed=65536)
-        if len(self.total_task_queue) > 0:
-            total_task_id = self.total_task_queue.pop()
-            self.progress.update(total_task_id, completed=65536)
+        if self.total_task is not None:
+            self.progress.update(self.total_task, completed=65536)
+        if self.curr_task is not None:
+            self.progress.update(self.curr_task, completed=65536)

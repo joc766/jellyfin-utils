@@ -1,57 +1,118 @@
+import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import click
 from dotenv import load_dotenv
-from rich import get_console
+from InquirerPy.base.control import Choice
+from InquirerPy.prompts.list import ListPrompt
+from rich.console import Console
+from rich.table import Table
 
 from media_tools.rsync_tool.models import ContentFormat, ContentType
 
-from .ffmpeg_tool import compress_mkv
-from .makemkv_tool import rip_disk
-from .omdb_tool import MissingCredentialsError, rename_movie
-from .rsync_tool import interactive_sync
-
-# TODO: re-examine the behavior of load_dotenv, may want to replace it with a proper configuration system
-load_dotenv("/Users/linkit/Projects/gh/jellyfin-utils/.env", override=False)
-
-console = get_console()
+from .ffmpeg_tool import FFmpegClient, compress_mkv
+from .makemkv_tool import MakeMKVClient, rip_disk
+from .omdb_tool import OmdbClient
+from .other import find_missing_compressed_movies, find_missing_raw_movies
+from .rsync_tool import RsyncClient, interactive_sync
 
 # TODO: add a setup command to create a config with
-# info like the base dir for everyting and the target server
-# TODO: Add organize_files functionality
-# TODO: implement OMDB API calls
-# TODO: delete files after successful sync to server?
-# TODO: command that shows files in your compressed/raw base dirs that are not on the server
 # TODO: command to eject disk tray (with default /dev/disk6)
+# TODO: add command to safely delete from local_base when jellyfin_base has src
+
+
+@dataclass(frozen=True)
+class AppConfig:
+    jellyfin_base: Path
+    jellyfin_host: str
+    jellyfin_user: str
+    local_base: Path
+    omdb_api_key: str
+
+
+@dataclass(frozen=True)
+class AppContext:
+    config: AppConfig
+    console: Console
+
+
+def require_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
+
+def load_config(dotenv_path: Path | None = None) -> AppConfig:
+    load_dotenv(dotenv_path)
+
+    return AppConfig(
+        local_base=Path(require_env("LOCAL_BASE")),
+        jellyfin_base=Path(require_env("JELLYFIN_BASE")),
+        jellyfin_user=require_env("JELLYFIN_USER"),
+        jellyfin_host=require_env("JELLYFIN_HOST"),
+        omdb_api_key=require_env("OMDB_API_KEY"),
+    )
 
 
 @click.group()
-def cli():
-    pass
+@click.pass_context
+@click.option("--env-file", "env_file", type=click.Path(path_type=Path))
+def cli(ctx: click.Context, env_file: Path | None = None):
+    if not env_file:
+        home_dir = Path(require_env("HOME"))
+        env_path = home_dir / ".config" / "media-tools" / ".env"
+    else:
+        env_path = env_file
+    if not env_path.is_file():
+        raise click.ClickException(f"No .env file found in {str(env_path.parent)}")
+    config = load_config(env_path)
+    ctx.obj = AppContext(config=config, console=Console())
 
 
 @cli.command("organize")
-@click.argument("path", type=click.Path(path_type=Path))
+@click.option("--movie", "content_type", flag_value="movie", default=True)
+@click.option("--show", "content_type", flag_value="show")
 @click.argument("imdb_id", type=str)
-def organize_cmd(path: Path, imdb_id: str):
+@click.pass_obj
+def organize_cmd(app_ctx: AppContext, imdb_id: str, content_type: str):
+    client = OmdbClient(app_ctx.config.omdb_api_key)
+    title = client.get_title(imdb_id)
+    console = app_ctx.console
+    content_base = app_ctx.config.local_base / "raw" / content_type
+    folder_choices = [
+        Choice(value=folder, name=folder.stem)
+        for folder in content_base.iterdir()
+        if folder.is_dir()
+    ]
+    path = ListPrompt(
+        f"Select the folder for {title}",
+        choices=folder_choices,
+        vi_mode=True,
+    ).execute()
+    console.print(f"mv '{path}' '{path.parent / title}'")
     try:
-        rename_movie(path, imdb_id)
-    except MissingCredentialsError as e:
-        raise click.ClickException(str(e)) from e
+        client.rename_movie(path, imdb_id)
     except Exception as e:
         raise click.ClickException(str(e)) from e
 
 
 @cli.command("rip")
-@click.option("--tv", "content_type", flag_value="tv")
-@click.option("--movie", "content_type", flag_value="movie", default=True)
 @click.option("--verbose", "-v", is_flag=True)
-@click.option("--output_base", "-o", "output_base", type=click.Path(path_type=Path))
-@click.option("--overwrite", is_flag=True, default=False)
+@click.option("--movie", "content_type", flag_value="movie", default=True)
+@click.option("--tv", "content_type", flag_value="tv")
+@click.option("--debug", "debug", is_flag=True)
+@click.pass_obj
 def rip_disk_cmd(
-    output_base: Path, content_type: str, verbose: bool = False, overwrite: bool = False
+    app_ctx: AppContext, content_type: ContentType, verbose: bool = False, debug: bool = False
 ):
-    rip_disk(content_type, output_base=output_base, verbose=verbose, overwrite=overwrite)
+    try:
+        output_base = app_ctx.config.local_base / "raw" / content_type
+        client = MakeMKVClient(output_base=output_base, console=app_ctx.console)
+        rip_disk(client, verbose=verbose, debug=debug)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
 @cli.command("compress")
@@ -60,32 +121,46 @@ def rip_disk_cmd(
 @click.option("--movie", "content_type", flag_value="movie", default=True)
 @click.option("--tv", "content_type", flag_value="tv")
 @click.option("--overwrite", "-f", "overwrite", is_flag=True)
-@click.option("--output", "-o", type=click.Path(path_type=Path))
-@click.option("--output_dir", "output_dir", type=click.Path(path_type=Path))
-@click.option("--output_filename", "output_filename", type=str)
-@click.option("--container", "-c", "container", type=str, default="mp4")
 @click.option("--verbose", "-v", is_flag=True)
-@click.argument("input_path", type=click.Path(path_type=Path))
+@click.pass_obj
 def compress_mkv_cmd(
-    input_path: Path,
+    app_ctx: AppContext,
     disc_type: str,
     content_type: str,
     overwrite: bool,
-    container: str,
-    output: Path | None = None,
-    output_dir: Path | None = None,
-    output_filename: str | None = None,
     verbose: bool = False,
 ):
+    compressed_storage_base = app_ctx.config.local_base / "compressed" / content_type
+    raw_storage_base = app_ctx.config.local_base / "raw" / content_type
+    selected_folder = ListPrompt(
+        message="Select a raw movie folder:",
+        choices=[
+            Choice(value=folder, name=folder.stem)
+            for folder in raw_storage_base.iterdir()
+            if folder.is_dir()
+        ],
+        vi_mode=True,
+    ).execute()
+    selected_movie = ListPrompt(
+        message="Select a title to compress:",
+        choices=[
+            Choice(value=file, name=file.name)
+            for file in selected_folder.iterdir()
+            if file.is_file()
+        ],
+        vi_mode=True,
+    ).execute()
+    output_path: Path = compressed_storage_base / selected_folder.stem / selected_movie.name
+    output_path.parent.mkdir(exist_ok=True)
+    client = FFmpegClient(
+        input_path=selected_movie,
+        output_path=output_path,
+        console=app_ctx.console,
+        source_type=disc_type,
+    )
     try:
         compress_mkv(
-            input_path,
-            disc_type,
-            content_type=content_type,
-            output=output,
-            output_dir=output_dir,
-            output_filename=output_filename,
-            output_container=container,
+            client,
             overwrite=overwrite,
             verbose=verbose,
         )
@@ -101,9 +176,18 @@ def compress_mkv_cmd(
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
-def upload_to_server(content_type: ContentType, content_format: ContentFormat, verbose: bool):
-    # TODO: add part where we prompt the user for options to upload based on content_type and content_format
-    interactive_sync("upload", content_type, content_format, verbose=verbose)
+@click.pass_obj
+def upload_to_server(
+    app_ctx: AppContext, content_type: ContentType, content_format: ContentFormat, verbose: bool
+):
+    client = RsyncClient.from_config(
+        app_ctx.config,
+        console=app_ctx.console,
+        direction="upload",
+        content_format=content_format,
+        content_type=content_type,
+    )
+    interactive_sync(client, verbose=verbose)
 
 
 @cli.command("download")
@@ -112,11 +196,53 @@ def upload_to_server(content_type: ContentType, content_format: ContentFormat, v
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
+@click.option("--debug", "debug", is_flag=True)
+@click.pass_obj
 def download_from_server(
-    content_type: ContentType, content_format: ContentFormat, verbose: bool = False
+    app_ctx: AppContext,
+    content_type: ContentType,
+    content_format: ContentFormat,
+    verbose: bool = False,
+    debug: bool = False,
 ):
-    # TODO: add part where we prompt the user for options to upload based on content_type and content_format
-    interactive_sync("download", content_type, content_format, verbose=verbose)
+    client = RsyncClient.from_config(
+        app_ctx.config,
+        console=app_ctx.console,
+        direction="download",
+        content_format=content_format,
+        content_type=content_type,
+    )
+    interactive_sync(client, verbose=verbose, debug=debug)
+
+
+@cli.command("find-missing-raw")
+@click.pass_obj
+def find_missing_raw(app_ctx: AppContext):
+    console = app_ctx.console
+    missing_table = Table(title="Compressed movies with no raw backup on server")
+    missing_table.add_column("movie_name")
+    for movie_name in sorted(
+        find_missing_raw_movies(
+            app_ctx.config.jellyfin_host, app_ctx.config.jellyfin_user, app_ctx.config.jellyfin_base
+        )
+    ):
+        missing_table.add_row(movie_name)
+    console.print(missing_table)
+
+
+@cli.command("find-missing-compressed")
+@click.pass_obj
+def find_missing_compressed(app_ctx: AppContext):
+    console = app_ctx.console
+    missing_table = Table(title="Raw movies with no compressed version on server")
+    missing_table.add_column("movie_name")
+    for movie_name in sorted(
+        find_missing_compressed_movies(
+            app_ctx.config.jellyfin_host, app_ctx.config.jellyfin_user, app_ctx.config.jellyfin_base
+        )
+    ):
+        missing_table.add_row(movie_name)
+    console.print(missing_table)
 
 
 def main():

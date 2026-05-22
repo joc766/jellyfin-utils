@@ -4,25 +4,31 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from rich import get_console
+from rich.console import Console
 from rich.text import Text
-
-console = get_console()
 
 
 class FFmpegClient:
     def __init__(
         self,
+        *,
         input_path: Path,
+        output_path: Path,
+        console: Console | None = None,
         source_type: str = "DVD",
         executable: str = "ffmpeg",
     ):
         self.executable = executable
         self.source_type = source_type
         self.input_path = input_path
+        self.output_path = output_path
+        self.console = console
 
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
+
+        if not self.output_path.parent.exists():
+            raise FileNotFoundError(f"output parent dir {output_path.parent} does not exist.")
 
     def get_ffprobe_info(self) -> dict[str, Any]:
         """Returns the max duration between the first video stream and first audio stream"""
@@ -87,15 +93,17 @@ class FFmpegClient:
 
     def start_compress_mkv(
         self,
-        output_path: Path,
         overwrite: bool = False,
-        deinterlace: bool = True,
+        deinterlace: bool = False,
         verbose: bool = False,
     ):
         """
         Starts ffmpeg with the h264 and AAC codecs for the first video stream and first audio stream.
         Re-containerizes to MP4 and ensures consistency across inputs.
         """
+        if not overwrite and self.output_path.exists():
+            raise FileExistsError(f"overwrite=False and {self.output_path} already exists.")
+
         command = [self.executable]
         if overwrite:
             command.append("-y")
@@ -149,10 +157,10 @@ class FFmpegClient:
         elif deinterlace:
             command.extend(["-vf", deinterlace_filter])
 
-        command.append(str(output_path))
+        command.append(str(self.output_path))
 
-        if verbose:
-            console.print(Text(" ".join(command)))
+        if verbose and self.console is not None:
+            self.console.print(Text(" ".join(command)))
 
         ffmpeg_proc = subprocess.Popen(
             command,

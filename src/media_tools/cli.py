@@ -11,7 +11,7 @@ from rich.table import Table
 
 from media_tools.rsync_tool.models import ContentFormat, ContentType
 
-from .ffmpeg_tool import compress_mkv
+from .ffmpeg_tool import FFmpegClient, compress_mkv
 from .makemkv_tool import MakeMKVClient, rip_disk
 from .omdb_tool import OmdbClient
 from .other import find_missing_compressed_movies, find_missing_raw_movies
@@ -121,32 +121,48 @@ def rip_disk_cmd(
 @click.option("--movie", "content_type", flag_value="movie", default=True)
 @click.option("--tv", "content_type", flag_value="tv")
 @click.option("--overwrite", "-f", "overwrite", is_flag=True)
-@click.option("--output", "-o", type=click.Path(path_type=Path))
-@click.option("--output_dir", "output_dir", type=click.Path(path_type=Path))
-@click.option("--output_filename", "output_filename", type=str)
-@click.option("--container", "-c", "container", type=str, default="mp4")
 @click.option("--verbose", "-v", is_flag=True)
-@click.argument("input_path", type=click.Path(path_type=Path))
+@click.pass_obj
 def compress_mkv_cmd(
-    input_path: Path,
+    app_ctx: AppContext,
     disc_type: str,
     content_type: str,
     overwrite: bool,
-    container: str,
-    output: Path | None = None,
-    output_dir: Path | None = None,
-    output_filename: str | None = None,
     verbose: bool = False,
 ):
+    compressed_storage_base = app_ctx.config.local_base / "compressed" / content_type
+    raw_storage_base = app_ctx.config.local_base / "raw" / content_type
+    selected_folder = ListPrompt(
+        message="Select a raw movie folder:",
+        choices=[
+            Choice(value=folder, name=folder.stem)
+            for folder in raw_storage_base.iterdir()
+            if folder.is_dir()
+        ],
+        vi_mode=True,
+    ).execute()
+    selected_movie = ListPrompt(
+        message="Select a title to compress:",
+        choices=[
+            Choice(value=file, name=file.name)
+            for file in selected_folder.iterdir()
+            if file.is_file()
+        ],
+        vi_mode=True,
+    ).execute()
+    output_path: Path = (
+        compressed_storage_base / selected_folder.stem / f"{selected_movie.stem}.mp4"
+    )
+    output_path.parent.mkdir(exist_ok=True)
+    client = FFmpegClient(
+        input_path=selected_movie,
+        output_path=output_path,
+        console=app_ctx.console,
+        source_type=disc_type,
+    )
     try:
         compress_mkv(
-            input_path,
-            disc_type,
-            content_type=content_type,
-            output=output,
-            output_dir=output_dir,
-            output_filename=output_filename,
-            output_container=container,
+            client,
             overwrite=overwrite,
             verbose=verbose,
         )

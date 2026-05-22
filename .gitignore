@@ -1,0 +1,10 @@
+/movies
+dune_command.sh
+idet_mkv.sh
+probe_mkv.sh
+todo.md
+.DS_Store
+__pycache__/
+.env
+*.egg-info/
+TIMELOG.md

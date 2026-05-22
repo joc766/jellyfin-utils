@@ -11,10 +11,11 @@ requires-python = ">= 3.10"
 authors = [{name = "Jack O'Connor",email= "coders-alcoves.7x@icloud.com"}]
 dependencies = [
   "rich>=15.0.0",
-  "python-dotenv>1.2.2",
+  "python-dotenv>=1.2.2",
   "click>8.3.3",
   "inquirerpy>=0.3.4",
-  "requests>=2.34.0"
+  "requests>=2.34.0",
+  "paramiko>=5.0.0"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

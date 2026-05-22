@@ -45,6 +45,9 @@ def require_env(name: str) -> str:
 
 
 def load_config(dotenv_path: Path | None = None) -> AppConfig:
+    if dotenv_path is not None and not dotenv_path.is_file():
+        raise FileNotFoundError(f"No .env file found in {str(dotenv_path.parent)}")
+
     load_dotenv(dotenv_path)
 
     return AppConfig(
@@ -65,9 +68,10 @@ def cli(ctx: click.Context, env_file: Path | None = None):
         env_path = home_dir / ".config" / "media-tools" / ".env"
     else:
         env_path = env_file
-    if not env_path.is_file():
-        raise click.ClickException(f"No .env file found in {str(env_path.parent)}")
-    config = load_config(env_path)
+    try:
+        config = load_config(env_path)
+    except (RuntimeError, FileNotFoundError) as e:
+        raise click.ClickException(str(e)) from e
     ctx.obj = AppContext(config=config, console=Console())
 
 

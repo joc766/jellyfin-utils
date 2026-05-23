@@ -200,7 +200,7 @@ class RsyncClient:
 
         return rsync_cmd
 
-    def get_list_of_files(self, debug: bool = False) -> dict[str, dict[str, RsyncChangeInfo]]:
+    def get_new_files(self, debug: bool = False) -> dict[str, dict[str, RsyncChangeInfo]]:
         """Get the list of files in local_base not in jellyfin_base using sync(dry_run=True)"""
         content_to_sync = defaultdict(dict[str, RsyncChangeInfo])
         for line in self.sync(dry_run=True, debug=debug):

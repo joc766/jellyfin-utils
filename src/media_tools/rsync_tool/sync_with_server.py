@@ -39,7 +39,7 @@ def sync_with_server(
 def interactive_sync(client: RsyncClient, verbose: bool = False, debug: bool = False) -> None:
     if verbose:
         client.console.print(f"src: {client.src.render()}\ndest: {client.dest.render()}")
-    content_to_sync = client.get_list_of_files(debug=debug)
+    content_to_sync = client.get_new_files(debug=debug)
     table = Table(
         title=f"{client.content_format.capitalize()} {client.content_type.capitalize()}s found in src not on server",
         show_lines=True,

@@ -9,13 +9,11 @@ from InquirerPy.prompts.list import ListPrompt
 from rich.console import Console
 from rich.table import Table
 
-from media_tools.rsync_tool.models import ContentFormat, ContentType
-
 from .ffmpeg_tool import FFmpegClient, compress_mkv
 from .makemkv_tool import MakeMKVClient, rip_disk
 from .omdb_tool import OmdbClient
-from .other import find_missing_compressed_movies, find_missing_raw_movies
-from .rsync_tool import RsyncClient, interactive_sync
+from .rsync_tool import ContentFormat, ContentType, RsyncClient, interactive_sync
+from .sftp_tool import JellyfinSFTPClient, get_imdb_id
 
 # TODO: add a setup command to create a config with
 # TODO: command to eject disk tray (with default /dev/disk6)
@@ -224,14 +222,11 @@ def download_from_server(
 @cli.command("find-missing-raw")
 @click.pass_obj
 def find_missing_raw(app_ctx: AppContext):
+    sftp_client = JellyfinSFTPClient.from_config(app_ctx.config)
     console = app_ctx.console
     missing_table = Table(title="Compressed movies with no raw backup on server")
     missing_table.add_column("movie_name")
-    for movie_name in sorted(
-        find_missing_raw_movies(
-            app_ctx.config.jellyfin_host, app_ctx.config.jellyfin_user, app_ctx.config.jellyfin_base
-        )
-    ):
+    for movie_name in sorted(sftp_client.find_missing_raw_movies()):
         missing_table.add_row(movie_name)
     console.print(missing_table)
 
@@ -239,14 +234,11 @@ def find_missing_raw(app_ctx: AppContext):
 @cli.command("find-missing-compressed")
 @click.pass_obj
 def find_missing_compressed(app_ctx: AppContext):
+    sftp_client = JellyfinSFTPClient.from_config(app_ctx.config)
     console = app_ctx.console
     missing_table = Table(title="Raw movies with no compressed version on server")
     missing_table.add_column("movie_name")
-    for movie_name in sorted(
-        find_missing_compressed_movies(
-            app_ctx.config.jellyfin_host, app_ctx.config.jellyfin_user, app_ctx.config.jellyfin_base
-        )
-    ):
+    for movie_name in sorted(sftp_client.find_missing_compressed_movies()):
         missing_table.add_row(movie_name)
     console.print(missing_table)
 

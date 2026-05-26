@@ -23,8 +23,8 @@ from .sftp_tool import JellyfinSFTPClient, get_imdb_id
 @dataclass(frozen=True)
 class AppConfig:
     jellyfin_base: Path
-    jellyfin_host: str
-    jellyfin_user: str
+    jellyfin_host: str | None
+    jellyfin_user: str | None
     local_base: Path
     omdb_api_key: str
 
@@ -51,8 +51,8 @@ def load_config(dotenv_path: Path | None = None) -> AppConfig:
     return AppConfig(
         local_base=Path(require_env("LOCAL_BASE")),
         jellyfin_base=Path(require_env("JELLYFIN_BASE")),
-        jellyfin_user=require_env("JELLYFIN_USER"),
-        jellyfin_host=require_env("JELLYFIN_HOST"),
+        jellyfin_user=os.getenv("JELLYFIN_USER"),
+        jellyfin_host=os.getenv("JELLYFIN_HOST"),
         omdb_api_key=require_env("OMDB_API_KEY"),
     )
 
@@ -180,9 +180,14 @@ def compress_mkv_cmd(
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
+@click.option("--debug", "debug", is_flag=True)
 @click.pass_obj
 def upload_to_server(
-    app_ctx: AppContext, content_type: ContentType, content_format: ContentFormat, verbose: bool
+    app_ctx: AppContext,
+    content_type: ContentType,
+    content_format: ContentFormat,
+    verbose: bool,
+    debug: bool,
 ):
     client = RsyncClient.from_config(
         app_ctx.config,
@@ -191,7 +196,7 @@ def upload_to_server(
         content_format=content_format,
         content_type=content_type,
     )
-    interactive_sync(client, verbose=verbose)
+    interactive_sync(client, verbose=verbose, debug=debug)
 
 
 @cli.command("download")

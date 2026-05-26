@@ -1,10 +1,12 @@
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 import click
 from dotenv import load_dotenv
 from InquirerPy.base.control import Choice
+from InquirerPy.prompts.checkbox import CheckboxPrompt
 from InquirerPy.prompts.list import ListPrompt
 from rich.console import Console
 from rich.table import Table
@@ -246,6 +248,48 @@ def find_missing_compressed(app_ctx: AppContext):
     for movie_name in sorted(sftp_client.find_missing_compressed_movies()):
         missing_table.add_row(movie_name)
     console.print(missing_table)
+
+
+@cli.command("safe-remove")
+@click.option("--raw", "content_format", flag_value="raw", type=str, default=True)
+@click.option("--compressed", "content_format", flag_value="compressed", type=str)
+@click.option("--movie", "content_type", flag_value="movie", type=str, default=True)
+@click.option("--show", "content_type", flag_value="show", type=str)
+@click.pass_obj
+def safe_removal(app_ctx: AppContext, content_format: ContentFormat, content_type: ContentType):
+    """Get files that can be safely removed by comparing RsyncClient.get_new_files() to all folders"""
+    # TODO: actually delete the selected files
+    rsync_client = RsyncClient.from_config(
+        config=app_ctx.config,
+        console=app_ctx.console,
+        direction="upload",
+        content_type=content_type,
+        content_format=content_format,
+    )
+    local_path = app_ctx.config.local_base / content_format / content_type
+    all_folder_info = {
+        get_imdb_id(str(folder.stem)): folder for folder in local_path.iterdir() if folder.is_dir()
+    }
+    all_folder_ids = {imdb_id for imdb_id in all_folder_info.keys()}
+    missing_folder_info = rsync_client.get_new_files()
+    missing_folder_ids = {get_imdb_id(folder_name) for folder_name in missing_folder_info.keys()}
+    deletable_ids = all_folder_ids - missing_folder_ids
+    deletable_folders = [v for k, v in all_folder_info.items() if k in deletable_ids]
+    if len(deletable_folders) > 0:
+        selected = CheckboxPrompt(
+            message=f"Select which titles you would like to remove from {app_ctx.config.local_base}",
+            choices=[
+                Choice(value=folder_path, name=folder_path.stem)
+                for folder_path in deletable_folders
+            ],
+            vi_mode=True,
+        ).execute()
+
+        for folder_path in selected:
+            shutil.rmtree(folder_path)
+            app_ctx.console.print(f"Deleted '{folder_path}'", markup=False)
+    else:
+        app_ctx.console.print("No deletable folders were found.")
 
 
 def main():

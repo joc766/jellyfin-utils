@@ -235,7 +235,7 @@ def find_missing_raw(app_ctx: AppContext):
     missing_table.add_column("movie_name")
     for movie_name in sorted(sftp_client.find_missing_raw_movies()):
         missing_table.add_row(movie_name)
-    console.print(missing_table)
+    console.print(missing_table, markup=False)
 
 
 @cli.command("find-missing-compressed")

@@ -19,6 +19,8 @@ def track_progress(
             if verbose:
                 print(repr(line))
             progress.handle_line(line)
+    except InterruptedError as e:
+        raise e
     finally:
         if not progress.stopped:
             progress.stop_progress()

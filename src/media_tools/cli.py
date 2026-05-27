@@ -198,7 +198,12 @@ def upload_to_server(
         content_format=content_format,
         content_type=content_type,
     )
-    interactive_sync(client, verbose=verbose, debug=debug)
+    try:
+        interactive_sync(client, verbose=verbose, debug=debug)
+    except AssertionError as e:
+        raise e
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
 @cli.command("download")
@@ -223,7 +228,12 @@ def download_from_server(
         content_format=content_format,
         content_type=content_type,
     )
-    interactive_sync(client, verbose=verbose, debug=debug)
+    try:
+        interactive_sync(client, verbose=verbose, debug=debug)
+    except AssertionError as e:
+        raise e
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
 @cli.command("find-missing-raw")

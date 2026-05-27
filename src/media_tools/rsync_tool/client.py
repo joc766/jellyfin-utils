@@ -1,4 +1,5 @@
 import re
+import signal
 import subprocess
 from collections import defaultdict
 from collections.abc import Generator
@@ -54,6 +55,7 @@ class RsyncClient:
         self.jellyfin_host: str | None = jellyfin_host
         self.jellyfin_user: str | None = jellyfin_user
         self.local_base: Path = local_base
+        self.rsync_proc = None
 
     @classmethod
     def from_config(
@@ -133,18 +135,22 @@ class RsyncClient:
         rsync_cmd = self.generate_command(src, dest, contents_only=contents_only, dry_run=dry_run)
         if debug:
             print(rsync_cmd)
-        rsync_proc = subprocess.Popen(
+        self.rsync_proc = subprocess.Popen(
             rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0, text=False
         )
 
-        assert rsync_proc.stdout is not None
+        assert self.rsync_proc.stdout is not None
 
+        interrupted = False
         try:
-            yield from self._get_chunks(rsync_proc.stdout, debug=debug)
-
+            yield from self._get_chunks(self.rsync_proc.stdout, debug=debug)
+        except KeyboardInterrupt as e:
+            self.rsync_proc.send_signal(signal.SIGINT)
+            interrupted = True
+            raise InterruptedError("Rsync aborted!") from e
         finally:
-            res = rsync_proc.wait()
-            if res != 0:
+            res = self.rsync_proc.wait()
+            if res != 0 and not interrupted:
                 raise RuntimeError(f"rsync failed with exit code {res}")
 
     def sync(self, dry_run: bool = False, debug: bool = False):

@@ -22,12 +22,6 @@ def compress_mkv(
             overwrite=overwrite, deinterlace=deinterlace, verbose=verbose
         ):
             progress.handle_line(line)
-    except InterruptedError as e:
-        progress.stop_progress()
-        if client.console is not None:
-            client.console.print(e, style="bold blue")
-        else:
-            raise e
     finally:
         if not progress.stopped:
             progress.stop_progress()

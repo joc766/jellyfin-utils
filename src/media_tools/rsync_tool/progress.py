@@ -2,6 +2,7 @@ import re
 
 from rich.console import Group
 from rich.live import Live
+from rich.markup import escape
 from rich.progress import (
     BarColumn,
     Progress,
@@ -71,9 +72,7 @@ class RsyncProgressTracker:
         if self.title_name is None:
             self.description = "Syncing files with rsync"
         else:
-            self.description = (
-                f"{self.direction.capitalize()}ing [italic cyan]{self.title_name}[/italic cyan]"
-            )
+            self.description = f"{self.direction.capitalize()}ing [italic cyan]'{escape(self.title_name)}'[/italic cyan]"
 
         self.initialize_progress = Progress(
             SpinnerColumn(), TextColumn("[bold green]{task.description}")

@@ -19,7 +19,6 @@ from .sftp_tool import JellyfinSFTPClient, get_imdb_id
 
 # TODO: add a setup command to create a config with
 # TODO: command to eject disk tray (with default /dev/disk6)
-# TODO: add command to safely delete from local_base when jellyfin_base has src
 
 
 @dataclass(frozen=True)
@@ -114,7 +113,7 @@ def rip_disk_cmd(
     try:
         output_base = app_ctx.config.local_base / "raw" / content_type
         client = MakeMKVClient(output_base=output_base, console=app_ctx.console)
-        rip_disk(client, verbose=verbose, debug=debug)
+        rip_disk(client, verbose=verbose, debug=debug, console=app_ctx.console)
     except Exception as e:
         raise click.ClickException(str(e)) from e
 
@@ -268,7 +267,6 @@ def find_missing_compressed(app_ctx: AppContext):
 @click.pass_obj
 def safe_removal(app_ctx: AppContext, content_format: ContentFormat, content_type: ContentType):
     """Get files that can be safely removed by comparing RsyncClient.get_new_files() to all folders"""
-    # TODO: actually delete the selected files
     rsync_client = RsyncClient.from_config(
         config=app_ctx.config,
         console=app_ctx.console,

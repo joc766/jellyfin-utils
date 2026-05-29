@@ -49,8 +49,12 @@ def load_config(dotenv_path: Path | None = None) -> AppConfig:
 
     load_dotenv(dotenv_path)
 
+    local_base = Path(require_env("LOCAL_BASE"))
+    if not local_base.exists():
+        raise FileNotFoundError(f"local_base {local_base} does not exist")
+
     return AppConfig(
-        local_base=Path(require_env("LOCAL_BASE")),
+        local_base=local_base,
         jellyfin_base=Path(require_env("JELLYFIN_BASE")),
         jellyfin_user=os.getenv("JELLYFIN_USER"),
         jellyfin_host=os.getenv("JELLYFIN_HOST"),
@@ -80,22 +84,22 @@ def cli(ctx: click.Context, env_file: Path | None = None):
 @click.argument("imdb_id", type=str)
 @click.pass_obj
 def organize_cmd(app_ctx: AppContext, imdb_id: str, content_type: str):
-    client = OmdbClient(app_ctx.config.omdb_api_key)
-    title = client.get_title(imdb_id)
-    console = app_ctx.console
-    content_base = app_ctx.config.local_base / "raw" / content_type
-    folder_choices = [
-        Choice(value=folder, name=folder.stem)
-        for folder in content_base.iterdir()
-        if folder.is_dir()
-    ]
-    path = ListPrompt(
-        f"Select the folder for {title}",
-        choices=folder_choices,
-        vi_mode=True,
-    ).execute()
-    console.print(f"mv '{path}' '{path.parent / title}'")
     try:
+        client = OmdbClient(app_ctx.config.omdb_api_key)
+        title = client.get_title(imdb_id)
+        console = app_ctx.console
+        content_base = app_ctx.config.local_base / "raw" / content_type
+        folder_choices = [
+            Choice(value=folder, name=folder.stem)
+            for folder in content_base.iterdir()
+            if folder.is_dir()
+        ]
+        path = ListPrompt(
+            f"Select the folder for {title}",
+            choices=folder_choices,
+            vi_mode=True,
+        ).execute()
+        console.print(f"mv '{path}' '{path.parent / title}'")
         client.rename_movie(path, imdb_id)
     except Exception as e:
         raise click.ClickException(str(e)) from e

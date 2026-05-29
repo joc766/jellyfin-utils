@@ -18,6 +18,7 @@ from .models import (
 )
 
 
+# TODO: Handle rsync < 3.0.0. Only issue: --info=progress2 does not exist, so can just print raw output most likely
 class RsyncClient:
     INTRO_MSG_PATTERN = re.compile(r"^sending incremental file list$")
     SENT_MSG_PATTERN = re.compile(r"^sent .* bytes  received .* bytes .* bytes/sec$")

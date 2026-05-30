@@ -141,7 +141,7 @@ class MakeMKVClient:
         existing_mkvs = list(self.output_path.glob("*.mkv"))
         if len(existing_mkvs) > 0:
             prompt = ConfirmPrompt(
-                f"{self.output_path} contains MKV files. Would you like to continue and overwrite these files?",
+                f"{self.output_path.stem} contains MKV files. Would you like to continue and overwrite these files?",
                 default=False,
             )
             prompt._session.app.erase_when_done = True

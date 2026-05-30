@@ -2,10 +2,10 @@ from InquirerPy.base.control import Choice
 from InquirerPy.prompts.checkbox import CheckboxPrompt
 from rich.console import Console
 
-from media_tools.makemkv_tool.progress import MakeMKVProgressTracker
-
 from .client import MakeMKVClient
 from .models import MakeMKVDiscInfo, MakeMKVTitleInfo
+from .progress import MakeMKVProgressTracker
+from .render import MakeMKVProgressRenderer
 
 
 def prompt_for_titles(disc_info: MakeMKVDiscInfo) -> list[MakeMKVTitleInfo]:
@@ -36,23 +36,36 @@ def rip_disk(
     console: Console | None = None,
 ):
 
-    with MakeMKVProgressTracker(console=console) as mkv_progress:
-        mkv_progress.set_status("Extracting drive info...")
-        for line in client.extract_drive_name():
-            mkv_progress.handle_line(line)
+    if console is None:
+        console = Console()
 
-        mkv_progress.set_status("Extracting disc info...")
+    progress_tracker = MakeMKVProgressTracker()
+    with MakeMKVProgressRenderer(console=console) as renderer:
+        progress_tracker.update_status(
+            "Running [repr.filename]makemkvcon info[/repr.filename] (drive info)"
+        )
+        for line in client.extract_drive_name():
+            curr_state = progress_tracker.handle_line(line)
+            renderer.update(curr_state)
+
+        progress_tracker.update_status(
+            "Running [repr.filename]makemkvcon info[/repr.filename] (disc info)"
+        )
         for line in client.extract_disc_info():
-            mkv_progress.handle_line(line)
+            curr_state = progress_tracker.handle_line(line)
+            renderer.update(curr_state)
 
         assert client.disc_info is not None
-        mkv_progress.suspend()
+        renderer.suspend()
         client.check_existing_mkvs()
         titles_to_rip = prompt_for_titles(client.disc_info)
 
-        mkv_progress.set_status("Beginning makemkvcon...")
-        mkv_progress.resume()
+        progress_tracker.update_status("Running [repr.filename]makemkvcon mkv[/repr.filename]")
+        renderer.resume()
         for i, title in enumerate(titles_to_rip):
-            mkv_progress.set_status(f"Ripping {title.title_name} ({i + 1}/{len(titles_to_rip)})")
+            progress_tracker.update_status(
+                f"Ripping {title.title_name} [dim][{i + 1}/{len(titles_to_rip)}][/dim]"
+            )
             for line in client.run_makemkv(title_id=title.title_id, verbose=verbose, debug=debug):
-                mkv_progress.handle_line(line)
+                curr_state = progress_tracker.handle_line(line)
+                renderer.update(curr_state)

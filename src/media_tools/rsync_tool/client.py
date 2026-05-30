@@ -1,4 +1,5 @@
 import re
+import signal
 import subprocess
 from collections import defaultdict
 from collections.abc import Generator
@@ -17,11 +18,12 @@ from .models import (
 )
 
 
+# TODO: Handle rsync < 3.0.0. Only issue: --info=progress2 does not exist, so can just print raw output most likely
 class RsyncClient:
     INTRO_MSG_PATTERN = re.compile(r"^sending incremental file list$")
     SENT_MSG_PATTERN = re.compile(r"^sent .* bytes  received .* bytes .* bytes/sec$")
     TOTAL_MSG_PATTERN = re.compile(r"^total size is .*  speedup is.*")
-    ITEMIZED_PATTERN = re.compile(r"^(?P<prefix>.{11})\s+(?P<size>\d+\.\d+[KMGB])\s+(?P<path>.+)$")
+    ITEMIZED_PATTERN = re.compile(r"^(?P<prefix>.+)\|(?P<size>.+)\|(?P<path>.+)$")
 
     CHANGES = {
         "s": "size",
@@ -36,8 +38,8 @@ class RsyncClient:
         self,
         *,
         jellyfin_base: Path,
-        jellyfin_host: str,
-        jellyfin_user: str,
+        jellyfin_host: str | None,
+        jellyfin_user: str | None,
         local_base: Path,
         console: Console,
         direction: TransferDirection,
@@ -51,9 +53,10 @@ class RsyncClient:
         self.content_type: ContentType = content_type
         self.console: Console = console
         self.jellyfin_base: Path = jellyfin_base
-        self.jellyfin_host: str = jellyfin_host
-        self.jellyfin_user: str = jellyfin_user
+        self.jellyfin_host: str | None = jellyfin_host
+        self.jellyfin_user: str | None = jellyfin_user
         self.local_base: Path = local_base
+        self.rsync_proc = None
 
     @classmethod
     def from_config(
@@ -131,18 +134,24 @@ class RsyncClient:
             src = RsyncLocation(src_root.path / subdir, host=src_root.host, user=src_root.user)
 
         rsync_cmd = self.generate_command(src, dest, contents_only=contents_only, dry_run=dry_run)
-        rsync_proc = subprocess.Popen(
+        if debug:
+            print(rsync_cmd)
+        self.rsync_proc = subprocess.Popen(
             rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0, text=False
         )
 
-        assert rsync_proc.stdout is not None
+        assert self.rsync_proc.stdout is not None
 
+        interrupted = False
         try:
-            yield from self._get_chunks(rsync_proc.stdout, debug=debug)
-
+            yield from self._get_chunks(self.rsync_proc.stdout, debug=debug)
+        except KeyboardInterrupt as e:
+            self.rsync_proc.send_signal(signal.SIGINT)
+            interrupted = True
+            raise InterruptedError("Rsync aborted!") from e
         finally:
-            res = rsync_proc.wait()
-            if res != 0:
+            res = self.rsync_proc.wait()
+            if res != 0 and not interrupted:
                 raise RuntimeError(f"rsync failed with exit code {res}")
 
     def sync(self, dry_run: bool = False, debug: bool = False):
@@ -163,7 +172,6 @@ class RsyncClient:
         rsync_cmd = [
             "rsync",
             "-rth",
-            "--rsync-path=sudo -n rsync",
         ]
         # filter rules
         rsync_cmd.extend(
@@ -183,11 +191,12 @@ class RsyncClient:
         if dry_run:
             rsync_cmd.append("--dry-run")
             rsync_cmd.append("-v")
-            rsync_cmd.append("--itemize-changes")
-            rsync_cmd.append("--out-format=%i %'''l %n")
+            rsync_cmd.append("--out-format=%i|%l|%n")
         else:
             rsync_cmd.append("--info=progress2")
-            rsync_cmd.append("--chmod=Du=rwx,Dg=rx,Do=rx,Fu=rw,Fg=r,Fo=r")
+            rsync_cmd.append("--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=rw,Fo=r")
+            rsync_cmd.append("--no-owner")
+            rsync_cmd.append("--no-group")
             rsync_cmd.append("--partial")
             rsync_cmd.append("--no-i-r")
 
@@ -200,7 +209,7 @@ class RsyncClient:
 
         return rsync_cmd
 
-    def get_list_of_files(self, debug: bool = False) -> dict[str, dict[str, RsyncChangeInfo]]:
+    def get_new_files(self, debug: bool = False) -> dict[str, dict[str, RsyncChangeInfo]]:
         """Get the list of files in local_base not in jellyfin_base using sync(dry_run=True)"""
         content_to_sync = defaultdict(dict[str, RsyncChangeInfo])
         for line in self.sync(dry_run=True, debug=debug):
@@ -217,7 +226,7 @@ class RsyncClient:
                         "filetype": prefix[1],
                         "changes_raw": prefix[2:],
                         "path": Path(item_match["path"]),
-                        "is_created": prefix[2:] == "+++++++++",
+                        "is_created": prefix[2:] == "+" * (len(prefix) - 2),
                         "changes": dict(zip("cstpoguax", prefix[2:], strict=False)),
                     }
                     path = itemized_changes["path"]
@@ -227,10 +236,11 @@ class RsyncClient:
                     else:
                         if itemized_changes["filetype"] == "f":
                             size = item_match["size"]
+                            size_human = self.format_bytes(float(size))
                             movie_title = str(path.parent)
                             filename = path.name
                             change_info = RsyncChangeInfo()
-                            change_info.size = size
+                            change_info.size = size_human
                             change_info.description = (
                                 "New"
                                 if itemized_changes["is_created"]
@@ -243,3 +253,14 @@ class RsyncClient:
                             content_to_sync[movie_title][filename] = change_info
 
         return content_to_sync
+
+    def format_bytes(self, size_in_bytes: float):
+        """Converts a byte count into a human-readable string format."""
+        # Use 1000 for decimal-based (KB, MB), or 1024 for binary-based (KiB, MiB)
+        factor = 1024
+        units = ["B", "KB", "MB", "GB", "TB", "PB"]
+        for unit in units:
+            if size_in_bytes < factor:
+                return f"{size_in_bytes:.2f} {unit}"
+            size_in_bytes /= factor
+        return f"{size_in_bytes:.2f} {units[-1]}"

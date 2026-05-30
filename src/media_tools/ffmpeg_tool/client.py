@@ -23,6 +23,7 @@ class FFmpegClient:
         self.input_path = input_path
         self.output_path = output_path
         self.console = console
+        self.ffmpeg_proc = None
 
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
@@ -162,7 +163,7 @@ class FFmpegClient:
         if verbose and self.console is not None:
             self.console.print(Text(" ".join(command)))
 
-        ffmpeg_proc = subprocess.Popen(
+        self.ffmpeg_proc = subprocess.Popen(
             command,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
@@ -171,18 +172,16 @@ class FFmpegClient:
             bufsize=1,
         )
 
-        assert ffmpeg_proc.stdout is not None
+        assert self.ffmpeg_proc.stdout is not None
 
-        # Hacky fix: use interrupted flag to handle interrupt
         interrupted = False
         try:
-            yield from ffmpeg_proc.stdout
-        except KeyboardInterrupt:
-            ffmpeg_proc.send_signal(signal.SIGINT)
+            yield from self.ffmpeg_proc.stdout
+        except KeyboardInterrupt as e:
             interrupted = True
+            self.ffmpeg_proc.send_signal(signal.SIGINT)
+            raise InterruptedError("FFmpeg Aborted!") from e
         finally:
-            res = ffmpeg_proc.wait()
-            if interrupted:
-                raise InterruptedError("FFmpeg Aborted!")
-            if res != 0:
+            res = self.ffmpeg_proc.wait()
+            if res != 0 and not interrupted:
                 raise RuntimeError(f"ffmpeg failed with exit code {res}")

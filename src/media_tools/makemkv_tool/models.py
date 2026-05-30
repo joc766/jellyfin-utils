@@ -97,3 +97,14 @@ class ProgValueEvent(ProgEvent):
     current: int
     total: int
     max: int
+
+
+@dataclass
+class MakeMKVProgressState:
+    prog_total: int | None
+    prog_curr: int | None
+    total_size: int
+    curr_size: int
+    status: str
+    total_task_name: str = ""
+    curr_task_name: str = ""

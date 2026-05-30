@@ -25,6 +25,16 @@ class RsyncLocation:
         return f"{prefix}:{path}"
 
 
+@dataclass
+class RsyncState:
+    total_transferred: str = ""
+    percent_completed: float = 0.0
+    speed: str = ""
+    time_remaining: str = ""
+    transfer_number: int | None = None
+    remaining_transfers: int | None = None
+
+
 class RsyncSources(NamedTuple):
     src: RsyncLocation
     dest: RsyncLocation

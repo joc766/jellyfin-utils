@@ -10,7 +10,6 @@ from .models import (
     StreamInfoEvent,
     TitleInfoEvent,
 )
-from .progress import MakeMKVProgressTracker
 
 
 class MakeMKVInfoBuilder:
@@ -102,7 +101,7 @@ class MakeMKVInfoBuilder:
         return self.disc_info
 
 
-class MKVInfoParser:
+class MakeMKVInfoParser:
     DISC_FIELD_MAP = {1: "disc_type", 2: "disc_title"}
 
     TITLE_FIELD_MAP = {
@@ -132,18 +131,14 @@ class MKVInfoParser:
         self.title_info_pattern = re.compile('^TINFO:(\\d+),(\\d+),(\\d+),"([^"]+)"$')
         self.stream_info_pattern = re.compile('^SINFO:(\\d+),(\\d+),(\\d+),(\\d+),"([^"]+)"$')
         self.builder = MakeMKVInfoBuilder()
-        self.progress = MakeMKVProgressTracker()
 
     def parse(self, lines: list) -> MakeMKVDiscInfo:
-        self.progress.start_progress()
         for line in lines:
             self.handle_line(line)
 
         return self.build()
 
     def handle_line(self, line: str):
-        self.progress.handle_line(line)
-
         if line[0:4] in ("CINF", "TINF", "SINF", "DRV:"):
             event = self.parse_line(line)
             if event is not None:
@@ -198,9 +193,7 @@ class MKVInfoParser:
                 return stream_info_event
 
     def extract_active_drive(self):
-        self.progress.stop_progress()
         return self.builder.extract_active_drive()
 
     def build(self):
-        self.progress.stop_progress()
         return self.builder.build()

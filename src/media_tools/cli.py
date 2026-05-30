@@ -1,32 +1,31 @@
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 import click
 from dotenv import load_dotenv
 from InquirerPy.base.control import Choice
+from InquirerPy.prompts.checkbox import CheckboxPrompt
 from InquirerPy.prompts.list import ListPrompt
 from rich.console import Console
 from rich.table import Table
 
-from media_tools.rsync_tool.models import ContentFormat, ContentType
-
 from .ffmpeg_tool import FFmpegClient, compress_mkv
 from .makemkv_tool import MakeMKVClient, rip_disk
 from .omdb_tool import OmdbClient
-from .other import find_missing_compressed_movies, find_missing_raw_movies
-from .rsync_tool import RsyncClient, interactive_sync
+from .rsync_tool import ContentFormat, ContentType, RsyncClient, interactive_sync
+from .sftp_tool import JellyfinSFTPClient, get_imdb_id
 
 # TODO: add a setup command to create a config with
 # TODO: command to eject disk tray (with default /dev/disk6)
-# TODO: add command to safely delete from local_base when jellyfin_base has src
 
 
 @dataclass(frozen=True)
 class AppConfig:
     jellyfin_base: Path
-    jellyfin_host: str
-    jellyfin_user: str
+    jellyfin_host: str | None
+    jellyfin_user: str | None
     local_base: Path
     omdb_api_key: str
 
@@ -50,11 +49,15 @@ def load_config(dotenv_path: Path | None = None) -> AppConfig:
 
     load_dotenv(dotenv_path)
 
+    local_base = Path(require_env("LOCAL_BASE"))
+    if not local_base.exists():
+        raise FileNotFoundError(f"local_base {local_base} does not exist")
+
     return AppConfig(
-        local_base=Path(require_env("LOCAL_BASE")),
+        local_base=local_base,
         jellyfin_base=Path(require_env("JELLYFIN_BASE")),
-        jellyfin_user=require_env("JELLYFIN_USER"),
-        jellyfin_host=require_env("JELLYFIN_HOST"),
+        jellyfin_user=os.getenv("JELLYFIN_USER"),
+        jellyfin_host=os.getenv("JELLYFIN_HOST"),
         omdb_api_key=require_env("OMDB_API_KEY"),
     )
 
@@ -81,22 +84,22 @@ def cli(ctx: click.Context, env_file: Path | None = None):
 @click.argument("imdb_id", type=str)
 @click.pass_obj
 def organize_cmd(app_ctx: AppContext, imdb_id: str, content_type: str):
-    client = OmdbClient(app_ctx.config.omdb_api_key)
-    title = client.get_title(imdb_id)
-    console = app_ctx.console
-    content_base = app_ctx.config.local_base / "raw" / content_type
-    folder_choices = [
-        Choice(value=folder, name=folder.stem)
-        for folder in content_base.iterdir()
-        if folder.is_dir()
-    ]
-    path = ListPrompt(
-        f"Select the folder for {title}",
-        choices=folder_choices,
-        vi_mode=True,
-    ).execute()
-    console.print(f"mv '{path}' '{path.parent / title}'")
     try:
+        client = OmdbClient(app_ctx.config.omdb_api_key)
+        title = client.get_title(imdb_id)
+        console = app_ctx.console
+        content_base = app_ctx.config.local_base / "raw" / content_type
+        folder_choices = [
+            Choice(value=folder, name=folder.stem)
+            for folder in content_base.iterdir()
+            if folder.is_dir()
+        ]
+        path = ListPrompt(
+            f"Select the folder for {title}",
+            choices=folder_choices,
+            vi_mode=True,
+        ).execute()
+        console.print(f"mv '{path}' '{path.parent / title}'")
         client.rename_movie(path, imdb_id)
     except Exception as e:
         raise click.ClickException(str(e)) from e
@@ -114,7 +117,7 @@ def rip_disk_cmd(
     try:
         output_base = app_ctx.config.local_base / "raw" / content_type
         client = MakeMKVClient(output_base=output_base, console=app_ctx.console)
-        rip_disk(client, verbose=verbose, debug=debug)
+        rip_disk(client, verbose=verbose, debug=debug, console=app_ctx.console)
     except Exception as e:
         raise click.ClickException(str(e)) from e
 
@@ -154,7 +157,9 @@ def compress_mkv_cmd(
         ],
         vi_mode=True,
     ).execute()
-    output_path: Path = compressed_storage_base / selected_folder.stem / selected_movie.name
+    output_path: Path = (
+        compressed_storage_base / selected_folder.stem / f"{selected_movie.stem}.mp4"
+    )
     output_path.parent.mkdir(exist_ok=True)
     client = FFmpegClient(
         input_path=selected_movie,
@@ -180,9 +185,14 @@ def compress_mkv_cmd(
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
+@click.option("--debug", "debug", is_flag=True)
 @click.pass_obj
 def upload_to_server(
-    app_ctx: AppContext, content_type: ContentType, content_format: ContentFormat, verbose: bool
+    app_ctx: AppContext,
+    content_type: ContentType,
+    content_format: ContentFormat,
+    verbose: bool,
+    debug: bool,
 ):
     client = RsyncClient.from_config(
         app_ctx.config,
@@ -191,7 +201,12 @@ def upload_to_server(
         content_format=content_format,
         content_type=content_type,
     )
-    interactive_sync(client, verbose=verbose)
+    try:
+        interactive_sync(client, verbose=verbose, debug=debug)
+    except AssertionError as e:
+        raise e
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
 @cli.command("download")
@@ -216,37 +231,77 @@ def download_from_server(
         content_format=content_format,
         content_type=content_type,
     )
-    interactive_sync(client, verbose=verbose, debug=debug)
+    try:
+        interactive_sync(client, verbose=verbose, debug=debug)
+    except AssertionError as e:
+        raise e
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
 @cli.command("find-missing-raw")
 @click.pass_obj
 def find_missing_raw(app_ctx: AppContext):
+    sftp_client = JellyfinSFTPClient.from_config(app_ctx.config)
     console = app_ctx.console
     missing_table = Table(title="Compressed movies with no raw backup on server")
     missing_table.add_column("movie_name")
-    for movie_name in sorted(
-        find_missing_raw_movies(
-            app_ctx.config.jellyfin_host, app_ctx.config.jellyfin_user, app_ctx.config.jellyfin_base
-        )
-    ):
+    for movie_name in sorted(sftp_client.find_missing_raw_movies()):
         missing_table.add_row(movie_name)
-    console.print(missing_table)
+    console.print(missing_table, markup=False)
 
 
 @cli.command("find-missing-compressed")
 @click.pass_obj
 def find_missing_compressed(app_ctx: AppContext):
+    sftp_client = JellyfinSFTPClient.from_config(app_ctx.config)
     console = app_ctx.console
     missing_table = Table(title="Raw movies with no compressed version on server")
     missing_table.add_column("movie_name")
-    for movie_name in sorted(
-        find_missing_compressed_movies(
-            app_ctx.config.jellyfin_host, app_ctx.config.jellyfin_user, app_ctx.config.jellyfin_base
-        )
-    ):
+    for movie_name in sorted(sftp_client.find_missing_compressed_movies()):
         missing_table.add_row(movie_name)
     console.print(missing_table)
+
+
+@cli.command("safe-remove")
+@click.option("--raw", "content_format", flag_value="raw", type=str, default=True)
+@click.option("--compressed", "content_format", flag_value="compressed", type=str)
+@click.option("--movie", "content_type", flag_value="movie", type=str, default=True)
+@click.option("--show", "content_type", flag_value="show", type=str)
+@click.pass_obj
+def safe_removal(app_ctx: AppContext, content_format: ContentFormat, content_type: ContentType):
+    """Get files that can be safely removed by comparing RsyncClient.get_new_files() to all folders"""
+    rsync_client = RsyncClient.from_config(
+        config=app_ctx.config,
+        console=app_ctx.console,
+        direction="upload",
+        content_type=content_type,
+        content_format=content_format,
+    )
+    local_path = app_ctx.config.local_base / content_format / content_type
+    all_folder_info = {
+        get_imdb_id(str(folder.stem)): folder for folder in local_path.iterdir() if folder.is_dir()
+    }
+    all_folder_ids = {imdb_id for imdb_id in all_folder_info.keys()}
+    missing_folder_info = rsync_client.get_new_files()
+    missing_folder_ids = {get_imdb_id(folder_name) for folder_name in missing_folder_info.keys()}
+    deletable_ids = all_folder_ids - missing_folder_ids
+    deletable_folders = [v for k, v in all_folder_info.items() if k in deletable_ids]
+    if len(deletable_folders) > 0:
+        selected = CheckboxPrompt(
+            message=f"Select which titles you would like to remove from {app_ctx.config.local_base}",
+            choices=[
+                Choice(value=folder_path, name=folder_path.stem)
+                for folder_path in deletable_folders
+            ],
+            vi_mode=True,
+        ).execute()
+
+        for folder_path in selected:
+            shutil.rmtree(folder_path)
+            app_ctx.console.print(f"Deleted '{folder_path}'", markup=False)
+    else:
+        app_ctx.console.print("No deletable folders were found.")
 
 
 def main():

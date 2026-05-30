@@ -3,7 +3,7 @@ from time import sleep
 
 from rich.console import Console
 
-from media_tools.rsync_tool import RsyncClient, RsyncProgressTracker
+from media_tools.rsync_tool import RsyncClient, RsyncProgressTracker, RsyncRender
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -19,17 +19,16 @@ def test_rsync_progress(slow: bool = False):
         content_format="compressed",
         content_type="movie",
     )
-    progress = RsyncProgressTracker()
 
     with open(DATA_DIR / "rsync-sample-log.txt", "rb") as f:
-        try:
-            for line in client._get_chunks(f):
-                progress.handle_line(line)
+        progress = RsyncProgressTracker(title_name="rsync-sample-log")
+        with RsyncRender(
+            title_name="rsync-sample-log", direction="upload", console=client.console
+        ) as render:
+            for curr_state in progress.track(client._get_chunks(f)):
+                render.update(curr_state)
                 if slow:
-                    if progress.finalizing:
+                    if curr_state.remaining_transfers == 0:
                         sleep(1)
                     else:
                         sleep(0.005)
-        finally:
-            if not progress.stopped:
-                progress.stop_progress()

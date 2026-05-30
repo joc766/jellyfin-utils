@@ -65,6 +65,18 @@ def test_ffprobe_field_order(tmp_path):
     assert returned_field_order == "progressive"
 
 
+def test_compress_interrupt(tmp_path):
+    test_mkv = get_large_test_file()
+    output = tmp_path / "test-small-mkv.mkv"
+    client = FFmpegClient(input_path=test_mkv, output_path=output, source_type="DVD")
+    with pytest.raises(InterruptedError):
+        generator = client.start_compress_mkv()
+        next(generator)
+        generator.throw(KeyboardInterrupt)
+    assert client.ffmpeg_proc is not None
+    assert client.ffmpeg_proc.returncode == 255
+
+
 # This test may take a couple minutes
 @pytest.mark.slow
 def test_compress_mkv(tmp_path):

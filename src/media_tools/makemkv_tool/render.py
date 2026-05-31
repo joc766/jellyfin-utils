@@ -91,7 +91,6 @@ class MakeMKVProgressRenderer:
         else:
             if self.total_task.start_time is not None:
                 self.total_progress.reset(self.total_task_id, start=False, visible=False)
-                self.total_progress.stop_task(self.total_task_id)
 
         if new_state.prog_curr is not None:
             if not self.curr_task.started:
@@ -106,7 +105,6 @@ class MakeMKVProgressRenderer:
         else:
             if self.curr_task.start_time is not None:
                 self.curr_progress.reset(self.curr_task_id, start=False, visible=False)
-                self.curr_progress.stop_task(self.curr_task_id)
 
         self.update_status(new_state.status)
 

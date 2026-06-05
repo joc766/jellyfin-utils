@@ -13,7 +13,7 @@ def compress_mkv(
     field_order = ffprobe_info["field_order"]
     progress = FFmpegProgressTracker()
     deinterlace = field_order != "progressive"
-    with FFmpegProgressRender(duration) as render:
+    with FFmpegProgressRender(client.input_path.stem, duration) as render:
         for line in client.start_compress_mkv(
             overwrite=overwrite, deinterlace=deinterlace, verbose=verbose
         ):

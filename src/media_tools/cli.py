@@ -148,35 +148,37 @@ def compress_mkv_cmd(
         ],
         vi_mode=True,
     ).execute()
-    selected_movie = ListPrompt(
+    selected_files = CheckboxPrompt(
         message="Select a title to compress:",
         choices=[
             Choice(value=file, name=file.name)
             for file in selected_folder.iterdir()
-            if file.is_file()
+            if file.is_file() and file.suffix in (".mkv", "mp4", ".mov")
         ],
         vi_mode=True,
     ).execute()
-    output_path: Path = (
-        compressed_storage_base / selected_folder.stem / f"{selected_movie.stem}.mp4"
-    )
-    output_path.parent.mkdir(exist_ok=True)
-    client = FFmpegClient(
-        input_path=selected_movie,
-        output_path=output_path,
-        console=app_ctx.console,
-        source_type=disc_type,
-    )
-    try:
-        compress_mkv(
-            client,
-            overwrite=overwrite,
-            verbose=verbose,
+
+    for selected_movie in selected_files:
+        output_path: Path = (
+            compressed_storage_base / selected_folder.stem / f"{selected_movie.stem}.mp4"
         )
-    except AssertionError as e:
-        raise e
-    except Exception as e:
-        raise click.ClickException(str(e)) from e
+        output_path.parent.mkdir(exist_ok=True)
+        client = FFmpegClient(
+            input_path=selected_movie,
+            output_path=output_path,
+            console=app_ctx.console,
+            source_type=disc_type,
+        )
+        try:
+            compress_mkv(
+                client,
+                overwrite=overwrite,
+                verbose=verbose,
+            )
+        except AssertionError as e:
+            raise e
+        except Exception as e:
+            raise click.ClickException(str(e)) from e
 
 
 @cli.command("upload")

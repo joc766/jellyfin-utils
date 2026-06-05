@@ -40,10 +40,11 @@ class FFmpegProgress(Progress):
 
 
 class FFmpegProgressRender:
-    def __init__(self, duration: float, console: Console | None = None):
+    def __init__(self, title_name: str, duration: float, console: Console | None = None):
         """duration: duration in seconds"""
         self.console = console or Console()
         self.duration = duration
+        self.title_name = title_name
         bar_width = self.console.width if self.console.width < 80 else 80
         self.progress = FFmpegProgress(
             BarColumn(bar_width=bar_width),
@@ -54,7 +55,7 @@ class FFmpegProgressRender:
             transient=True,
         )
         self.task_id = self.progress.add_task(
-            "Running ffmpeg compression", total=self.duration, start=False, visible=False
+            f"Compressing {self.title_name}", total=self.duration, start=False, visible=False
         )
 
     def __enter__(self):

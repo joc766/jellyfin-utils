@@ -2,18 +2,28 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import get_args
 
 import click
 from dotenv import load_dotenv
 from InquirerPy.base.control import Choice
 from InquirerPy.prompts.checkbox import CheckboxPrompt
+from InquirerPy.prompts.input import InputPrompt
 from InquirerPy.prompts.list import ListPrompt
+from InquirerPy.prompts.rawlist import RawlistPrompt
 from rich.console import Console
 from rich.table import Table
 
 from .ffmpeg_tool import FFmpegClient, compress_mkv
 from .makemkv_tool import MakeMKVClient, rip_disk
-from .omdb_tool import OmdbClient
+from .omdb_tool import (
+    MovieTitleOptions,
+    OmdbClient,
+    TvTitleOptions,
+    format_size_human,
+    organize_movie_title,
+    organize_tv_title,
+)
 from .rsync_tool import ContentFormat, ContentType, RsyncClient, interactive_sync
 from .sftp_tool import JellyfinSFTPClient, get_imdb_id
 
@@ -44,10 +54,14 @@ def require_env(name: str) -> str:
 
 
 def load_config(dotenv_path: Path | None = None) -> AppConfig:
-    if dotenv_path is not None and not dotenv_path.is_file():
+    if dotenv_path is None:
+        home_dir = Path(require_env("HOME"))
+        dotenv_path = home_dir / ".config" / "media-tools" / ".env"
+
+    if not dotenv_path.is_file():
         raise FileNotFoundError(f"No .env file found in {str(dotenv_path.parent)}")
 
-    load_dotenv(dotenv_path)
+    load_dotenv(dotenv_path, override=True)
 
     local_base = Path(require_env("LOCAL_BASE"))
     if not local_base.exists():
@@ -66,13 +80,8 @@ def load_config(dotenv_path: Path | None = None) -> AppConfig:
 @click.pass_context
 @click.option("--env-file", "env_file", type=click.Path(path_type=Path))
 def cli(ctx: click.Context, env_file: Path | None = None):
-    if not env_file:
-        home_dir = Path(require_env("HOME"))
-        env_path = home_dir / ".config" / "media-tools" / ".env"
-    else:
-        env_path = env_file
     try:
-        config = load_config(env_path)
+        config = load_config(env_file)
     except (RuntimeError, FileNotFoundError) as e:
         raise click.ClickException(str(e)) from e
     ctx.obj = AppContext(config=config, console=Console())
@@ -80,27 +89,61 @@ def cli(ctx: click.Context, env_file: Path | None = None):
 
 @cli.command("organize")
 @click.option("--movie", "content_type", flag_value="movie", default=True)
-@click.option("--show", "content_type", flag_value="show")
+@click.option("--tv", "content_type", flag_value="tv")
 @click.argument("imdb_id", type=str)
 @click.pass_obj
 def organize_cmd(app_ctx: AppContext, imdb_id: str, content_type: str):
     try:
         client = OmdbClient(app_ctx.config.omdb_api_key)
-        title = client.get_title(imdb_id)
-        console = app_ctx.console
+        omdb_title, omdb_year = client.get_title(imdb_id)
         content_base = app_ctx.config.local_base / "raw" / content_type
         folder_choices = [
             Choice(value=folder, name=folder.stem)
             for folder in content_base.iterdir()
             if folder.is_dir()
         ]
-        path = ListPrompt(
-            f"Select the folder for {title}",
+        title_folder: Path = ListPrompt(
+            f"Select the folder for {omdb_title}",
             choices=folder_choices,
             vi_mode=True,
         ).execute()
-        console.print(f"mv '{path}' '{path.parent / title}'")
-        client.rename_movie(path, imdb_id)
+
+        title_options = (
+            list(get_args(TvTitleOptions))
+            if content_type == "tv"
+            else list(get_args(MovieTitleOptions))
+        )
+        for title_file in title_folder.iterdir():
+            file_size = format_size_human(title_file.stat().st_size)
+            title_type = RawlistPrompt(
+                message=f"Select content type for {title_file.name} ({file_size})",
+                choices=title_options,
+                vi_mode=True,
+                transformer=lambda result: f"{result}",
+            ).execute()
+            match content_type:
+                case "tv":
+                    if title_type != "ignore":
+                        season = (
+                            InputPrompt(message="Enter Season Number: ").execute().rjust(2, "0")
+                        )
+                        episode = (
+                            InputPrompt(message="Enter Episode Number: ").execute().rjust(2, "0")
+                        )
+                        organize_tv_title(
+                            content_base,
+                            title_file,
+                            title_type,
+                            omdb_title,
+                            omdb_year,
+                            imdb_id,
+                            season,
+                            episode,
+                        )
+                case "movie":
+                    organize_movie_title(
+                        content_base, title_file, title_type, omdb_title, omdb_year, imdb_id
+                    )
     except Exception as e:
         raise click.ClickException(str(e)) from e
 

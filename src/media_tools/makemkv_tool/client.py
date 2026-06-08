@@ -2,7 +2,6 @@ import signal
 import subprocess
 from pathlib import Path
 
-from InquirerPy.prompts.confirm import ConfirmPrompt
 from rich.console import Console
 
 from .info_parser import MakeMKVInfoParser
@@ -87,6 +86,9 @@ class MakeMKVClient:
         assert hasattr(self.disc_info, "disc_title")
         assert hasattr(self, "output_path")
 
+        if not self.output_path.exists():
+            self.output_path.mkdir()
+
         if self.console is not None and debug:
             self.console.print(str(self.output_path))
 
@@ -131,24 +133,3 @@ class MakeMKVClient:
             res = mkv_proc.wait()
             if res != 0 and not interrupted:
                 raise RuntimeError(f"makemkvcon failed with exit code {res}")
-
-    def check_existing_mkvs(self):
-        assert hasattr(self, "output_path")
-        # Handle existing MKVs in output path
-        if not self.output_path.exists():
-            self.output_path.mkdir()
-
-        existing_mkvs = list(self.output_path.glob("*.mkv"))
-        if len(existing_mkvs) > 0:
-            prompt = ConfirmPrompt(
-                f"{self.output_path.stem} contains MKV files. Would you like to continue and overwrite these files?",
-                default=False,
-            )
-            prompt._session.app.erase_when_done = True
-            confirmed = prompt.execute()
-            if confirmed:
-                for file in existing_mkvs:
-                    file.unlink()
-            else:
-                raise FileExistsError(f"{self.output_path} contains MKV files.")
-        return

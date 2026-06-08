@@ -22,7 +22,7 @@ class SpeedColumn(ProgressColumn):
 
     def render(self, task: Task) -> Text:
         speed = task.fields.get("speed", "00.00 kB/s")
-        return Text(f"{speed}", style="yellow")
+        return Text(f"{speed}", style="green")
 
 
 class RsyncProgress(Progress):
@@ -44,10 +44,13 @@ class RsyncRender:
 
         self.transfer_progress = RsyncProgress(
             BarColumn(bar_width=bar_width),
-            TaskProgressColumn(),
+            TaskProgressColumn(
+                text_format="[progress.percentage][bright_white]{task.percentage:5.1f}%",
+                style="white",
+            ),
             TimeElapsedColumn(),
-            SpeedColumn(),
             TimeRemainingColumn(),
+            SpeedColumn(),
             console=console,
         )
 

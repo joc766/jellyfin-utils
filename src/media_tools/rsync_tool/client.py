@@ -1,3 +1,4 @@
+import codecs
 import re
 import signal
 import subprocess
@@ -104,8 +105,14 @@ class RsyncClient:
 
     def _get_chunks(self, input: IO, debug: bool = False) -> Generator[str, None, None]:
         # read newline or carriage return as chunk
+        decoder = codecs.getincrementaldecoder("utf-8")()
         chunk = ""
-        while char := input.read(1).decode("utf-8"):
+        while byte := input.read(1):
+            char = decoder.decode(byte)
+
+            if not char:
+                continue
+
             if char == "\n":
                 if debug:
                     self.console.print(chunk)
@@ -118,6 +125,14 @@ class RsyncClient:
                 chunk = char
             else:
                 chunk += char
+        remaining = decoder.decode(b"", final=True)
+        if remaining:
+            chunk += remaining
+
+        if chunk:
+            if debug:
+                self.console.print(chunk)
+            yield chunk
 
     def _sync(
         self,
@@ -230,27 +245,23 @@ class RsyncClient:
                         "changes": dict(zip("cstpoguax", prefix[2:], strict=False)),
                     }
                     path = itemized_changes["path"]
-                    if len(str(path).split("/")) != 2:
-                        pass
-                        # print(f"ignoring {line}")
-                    else:
-                        if itemized_changes["filetype"] == "f":
-                            size = item_match["size"]
-                            size_human = self.format_bytes(float(size))
-                            movie_title = str(path.parent)
-                            filename = path.name
-                            change_info = RsyncChangeInfo()
-                            change_info.size = size_human
-                            change_info.description = (
-                                "New"
-                                if itemized_changes["is_created"]
-                                else ",".join(
-                                    self.CHANGES[x]
-                                    for x in itemized_changes["changes"].values()
-                                    if x != "."
-                                )
+                    if itemized_changes["filetype"] == "f":
+                        size = item_match["size"]
+                        size_human = self.format_bytes(float(size))
+                        movie_title = path.parts[0]
+                        filename = str(Path(*path.parts[1:]))
+                        change_info = RsyncChangeInfo()
+                        change_info.size = size_human
+                        change_info.description = (
+                            "New"
+                            if itemized_changes["is_created"]
+                            else ",".join(
+                                self.CHANGES[x]
+                                for x in itemized_changes["changes"].values()
+                                if x != "."
                             )
-                            content_to_sync[movie_title][filename] = change_info
+                        )
+                        content_to_sync[movie_title][filename] = change_info
 
         return content_to_sync
 

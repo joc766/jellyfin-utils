@@ -182,7 +182,7 @@ def compress_mkv_cmd(
 ):
     compressed_storage_base = app_ctx.config.local_base / "compressed" / content_type
     raw_storage_base = app_ctx.config.local_base / "raw" / content_type
-    selected_folder = ListPrompt(
+    selected_folder: Path = ListPrompt(
         message="Select a raw movie folder:",
         choices=[
             Choice(value=folder, name=folder.stem)
@@ -194,18 +194,18 @@ def compress_mkv_cmd(
     selected_files = CheckboxPrompt(
         message="Select a title to compress:",
         choices=[
-            Choice(value=file, name=file.name)
-            for file in selected_folder.iterdir()
+            Choice(value=file, name=str(file.relative_to(selected_folder)))
+            for file in sorted(selected_folder.rglob("*"), key=lambda k: k.name)
             if file.is_file() and file.suffix in (".mkv", "mp4", ".mov")
         ],
         vi_mode=True,
     ).execute()
 
     for selected_movie in selected_files:
-        output_path: Path = (
-            compressed_storage_base / selected_folder.stem / f"{selected_movie.stem}.mp4"
-        )
-        output_path.parent.mkdir(exist_ok=True)
+        output_path: Path = compressed_storage_base / selected_movie.relative_to(
+            raw_storage_base
+        ).with_suffix(".mp4")
+        output_path.parent.mkdir(exist_ok=True, parents=True)
         client = FFmpegClient(
             input_path=selected_movie,
             output_path=output_path,
@@ -226,7 +226,7 @@ def compress_mkv_cmd(
 
 @cli.command("upload")
 @click.option("--movie", "content_type", flag_value="movie", default=True, type=str)
-@click.option("--show", "content_type", flag_value="show", type=str)
+@click.option("--tv", "content_type", flag_value="tv", type=str)
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
@@ -256,7 +256,7 @@ def upload_to_server(
 
 @cli.command("download")
 @click.option("--movie", "content_type", flag_value="movie", default=True, type=str)
-@click.option("--show", "content_type", flag_value="show", type=str)
+@click.option("--tv", "content_type", flag_value="tv", type=str)
 @click.option("--compressed", "content_format", flag_value="compressed", default=True, type=str)
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
@@ -312,6 +312,7 @@ def find_missing_compressed(app_ctx: AppContext):
 @click.option("--raw", "content_format", flag_value="raw", type=str, default=True)
 @click.option("--compressed", "content_format", flag_value="compressed", type=str)
 @click.option("--movie", "content_type", flag_value="movie", type=str, default=True)
+@click.option("--tv", "content_type", flag_value="tv", type=str)
 @click.option("--show", "content_type", flag_value="show", type=str)
 @click.pass_obj
 def safe_removal(app_ctx: AppContext, content_format: ContentFormat, content_type: ContentType):

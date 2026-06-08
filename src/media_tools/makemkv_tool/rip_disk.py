@@ -1,5 +1,6 @@
 from InquirerPy.base.control import Choice
 from InquirerPy.prompts.checkbox import CheckboxPrompt
+from InquirerPy.prompts.confirm import ConfirmPrompt
 from rich.console import Console
 
 from .client import MakeMKVClient
@@ -57,12 +58,28 @@ def rip_disk(
 
         assert client.disc_info is not None
         renderer.suspend()
-        client.check_existing_mkvs()
+        # client.check_existing_mkvs()
         titles_to_rip = prompt_for_titles(client.disc_info)
 
         progress_tracker.update_status("Running [repr.filename]makemkvcon mkv[/repr.filename]")
         renderer.resume()
         for i, title in enumerate(titles_to_rip):
+            # check if file already exists
+            curr_file = client.output_path / title.title_name
+            if curr_file.exists():
+                renderer.suspend()
+                prompt = ConfirmPrompt(
+                    f"{curr_file} already exists. Would you like to continue and overwrite these files?",
+                    default=False,
+                )
+                prompt._session.app.erase_when_done = True
+                confirmed = prompt.execute()
+                renderer.resume()
+                if confirmed:
+                    curr_file.unlink()
+                else:
+                    # would log a message here if there was a logger, #TODO
+                    continue
             progress_tracker.update_status(
                 f"Ripping {title.title_name} [dim][{i + 1}/{len(titles_to_rip)}][/dim]"
             )

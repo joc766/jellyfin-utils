@@ -97,6 +97,7 @@ class FFmpegClient:
         overwrite: bool = False,
         deinterlace: bool = False,
         verbose: bool = False,
+        preserve_surround_track: bool = False,
     ):
         """
         Starts ffmpeg with the h264 and AAC codecs for the first video stream and first audio stream.
@@ -121,7 +122,10 @@ class FFmpegClient:
                 "-map",
                 "0:v:0",
                 "-map",
-                "0:a:m:language:eng",
+                "0:a:0",
+                "-map",
+                "0:a:0",
+                # "0:a:m:language:eng",
                 "-sn",
             ]
         )
@@ -142,8 +146,15 @@ class FFmpegClient:
             ]
         )
         command.extend(["-maxrate", "20M", "-bufsize", "20M", "-x264-params", "interlaced=0"])
-        command.extend(["-c:a", "libfdk_aac", "-ac", "2", "-ab", "256k"])
-        command.extend(["-af", "acompressor=threshold=-20dB:ratio=3,loudnorm=I=-16:TP=-1.5:LRA=10"])
+        command.extend(["-c:a:0", "libfdk_aac", "-ac:a:0", "2", "-b:a:0", "256k"])
+        command.extend(
+            ["-filter:a:0", "acompressor=threshold=-20dB:ratio=3,loudnorm=I=-18:TP=-1.5:LRA=10"]
+        )
+        command.extend(["-c:a:1", "copy" if preserve_surround_track else "libfdk_aac"])
+        if not preserve_surround_track:
+            command.extend(["-b:a:1", "512k"])
+        command.extend(["-disposition:a:0", "default"])
+        command.extend(["-disposition:a:1", "0"])
         command.extend(
             ["-movflags", "+faststart", "-fflags", "+genpts", "-avoid_negative_ts", "make_zero"]
         )

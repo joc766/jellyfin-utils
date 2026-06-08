@@ -172,6 +172,7 @@ def rip_disk_cmd(
 @click.option("--tv", "content_type", flag_value="tv")
 @click.option("--overwrite", "-f", "overwrite", is_flag=True)
 @click.option("--verbose", "-v", is_flag=True)
+@click.option("--preserve-surround", "-p", "preserve_surround", is_flag=True)
 @click.pass_obj
 def compress_mkv_cmd(
     app_ctx: AppContext,
@@ -179,6 +180,7 @@ def compress_mkv_cmd(
     content_type: str,
     overwrite: bool,
     verbose: bool = False,
+    preserve_surround: bool = False,
 ):
     compressed_storage_base = app_ctx.config.local_base / "compressed" / content_type
     raw_storage_base = app_ctx.config.local_base / "raw" / content_type
@@ -217,6 +219,7 @@ def compress_mkv_cmd(
                 client,
                 overwrite=overwrite,
                 verbose=verbose,
+                preserve_surround_track=preserve_surround,
             )
         except AssertionError as e:
             raise e

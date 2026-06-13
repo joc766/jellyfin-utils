@@ -111,6 +111,10 @@ class FFmpegClient:
             command.append("-y")
         else:
             command.append("-n")
+        if self.source_type == "DVD":
+            crf = "21"
+        else:
+            crf = "18"
         command.extend(["-nostdin", "-progress", "pipe:1", "-nostats"])
         command.extend(["-i", str(self.input_path)])
         command.extend(
@@ -136,7 +140,7 @@ class FFmpegClient:
                 "-preset",
                 "slow",
                 "-crf",
-                "18",
+                crf,
                 "-pix_fmt",
                 "yuv420p",
                 "-profile:v",

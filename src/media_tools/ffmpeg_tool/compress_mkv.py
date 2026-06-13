@@ -14,12 +14,14 @@ def compress_mkv(
     preset: str = "slow",
     dry_run: bool = False,
 ):
-    ffprobe_info = client.get_ffprobe_info()
-    duration = ffprobe_info["duration"]
-    field_order = ffprobe_info["field_order"]
+    video_info = client.probe_video()
+    # TODO: use selected audio instead of first
+    audio_info = client.probe_audios()[0]
+    duration = max(video_info.tags.duration_eng, audio_info.tags.duration_eng)
+    field_order = video_info.field_order
     progress = FFmpegProgressTracker()
     deinterlace = field_order != "progressive"
-    with FFmpegProgressRender(client.input_path.stem, duration) as render:
+    with FFmpegProgressRender(client.input_path.stem, duration.seconds) as render:
         for line in client.start_compress_mkv(
             overwrite=overwrite,
             deinterlace=deinterlace,

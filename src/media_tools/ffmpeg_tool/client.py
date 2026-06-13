@@ -1,14 +1,17 @@
-import re
+import json
 import shlex
 import signal
 import subprocess
 from pathlib import Path
-from typing import Any
 
 from rich.console import Console
 from rich.text import Text
 
 from media_tools.db.connection import complete_request, create_new_request
+from media_tools.ffmpeg_tool.models import (
+    FFProbeAudioStreamInfo,
+    FFProbeVideoStreamInfo,
+)
 
 
 def create_ffmpeg_compress_cmd(
@@ -136,7 +139,7 @@ class FFmpegClient:
         self,
         *,
         input_path: Path,
-        output_path: Path,
+        output_path: Path | None = None,
         console: Console | None = None,
         source_type: str = "DVD",
         executable: str = "ffmpeg",
@@ -151,71 +154,54 @@ class FFmpegClient:
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
 
-        if not self.output_path.parent.exists():
-            raise FileNotFoundError(f"output parent dir {output_path.parent} does not exist.")
-
-    def get_ffprobe_info(self) -> dict[str, Any]:
-        """Returns the max duration between the first video stream and first audio stream"""
-        video_command = [
+    def probe_video(self) -> FFProbeVideoStreamInfo:
+        command = [
             "ffprobe",
             "-v",
             "error",
             "-select_streams",
             "v:0",
+            "-show_streams",
             "-show_entries",
-            "stream_tags=DURATION-eng",
-            "-show_entries",
-            "stream=field_order",
+            "stream=index,codec_name,codec_type,start_pts,start_time,profile,width,height,pix_fmt,level,field_order,sample_aspect_ratio,display_aspect_ratio:stream_disposition=default,original:stream_tags=language,title,DURATION-eng,NUMBER_OF_BYTES-eng,BPS-eng",
             "-of",
-            "default=nw=1",
+            "json",
             str(self.input_path),
         ]
-        audio_command = [
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        data = json.loads(result.stdout)
+        stream_info = FFProbeVideoStreamInfo.model_validate(data["streams"][0])
+        return stream_info
+
+    def probe_audios(self) -> list[FFProbeAudioStreamInfo]:
+        command = [
             "ffprobe",
             "-v",
             "error",
             "-select_streams",
-            "a:0",
+            "a:m:language:eng",
+            "-show_streams",
             "-show_entries",
-            "stream_tags=DURATION-eng",
+            "stream=index,codec_name,codec_type,sample_rate,channels,channel_layout,start_pts,start_time,bit_rate:stream_disposition=default,original",
             "-of",
-            "default=nw=1",
+            "json",
             str(self.input_path),
         ]
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
 
-        # Calculate video duration in seconds
-        video_result = subprocess.run(video_command, capture_output=True, text=True)
-        assert video_result.stdout is not None
-        video_duration_match = re.search(
-            "TAG:DURATION-eng=(\\d{2}):(\\d{2}):(\\d{2}.\\d+)", video_result.stdout
-        )
-        assert video_duration_match is not None
-        hours, minutes, seconds = video_duration_match.group(1, 2, 3)
-        video_duration = 0.0
-        video_duration += int(hours) * 3600
-        video_duration += int(minutes) * 60
-        video_duration += float(seconds)
+        data = json.loads(result.stdout)
+        all_stream_info = [FFProbeAudioStreamInfo.model_validate(x) for x in data["streams"]]
 
-        # Calculate audio duration in seconds
-        audio_result = subprocess.run(audio_command, bufsize=1, capture_output=True, text=True)
-        assert audio_result.stdout is not None
-        audio_duration_match = re.search(
-            "^TAG:DURATION-eng=(\\d{2}):(\\d{2}):(\\d{2}.\\d+)", audio_result.stdout.rstrip("\n")
-        )
-        assert audio_duration_match is not None
-        hours, minutes, seconds = audio_duration_match.group(1, 2, 3)
-        audio_duration = 0.0
-        audio_duration += int(hours) * 3600
-        audio_duration += int(minutes) * 60
-        audio_duration += float(seconds)
+        return all_stream_info
 
-        field_order_match = re.search(r"field_order=([a-z]+)", video_result.stdout)
-        assert field_order_match is not None
-        field_order = field_order_match.group(1)
+    def play_audio(self, index: int) -> None:
+        play_cmd = ["ffplay", "-ss", "00:05:00", "-vn", "-ast", str(index), str(self.input_path)]
+        try:
+            subprocess.run(play_cmd, stderr=subprocess.DEVNULL)
+        except KeyboardInterrupt:
+            pass
 
-        return {"duration": max([video_duration, audio_duration]), "field_order": field_order}
-
-    # TODO: use ffprobe to get width, height instead of the trunc bs
+    # TODO: use ffprobe to figure out if there's an existing stereo track to encode from
     def start_compress_mkv(
         self,
         overwrite: bool = False,
@@ -233,6 +219,10 @@ class FFmpegClient:
         Re-containerizes to MP4 and ensures consistency across inputs.
         """
         params_dict = {k: v for k, v in locals().items() if k != "self"}
+        if self.output_path is None:
+            raise FileNotFoundError("Output path cannot be None.")
+        if not self.output_path.parent.exists():
+            raise FileNotFoundError(f"output parent dir {self.output_path.parent} does not exist.")
         if not overwrite and self.output_path.exists():
             raise FileExistsError(f"overwrite=False and {self.output_path} already exists.")
 

@@ -1,3 +1,4 @@
+import datetime
 from collections import deque
 from pathlib import Path
 
@@ -50,9 +51,9 @@ def test_ffprobe_duration(tmp_path):
     test_mkv = get_large_test_file()
     output_path = tmp_path / test_mkv.name
     client = FFmpegClient(input_path=test_mkv, output_path=output_path, source_type="DVD")
-    correct_duration = 147.213733333
-    ffprobe_info = client.get_ffprobe_info()
-    returned_duration = ffprobe_info["duration"]
+    correct_duration = datetime.timedelta(seconds=147, microseconds=213733)
+    ffprobe_info = client.probe_video()
+    returned_duration = ffprobe_info.tags.duration_eng
     assert correct_duration == returned_duration
 
 
@@ -60,8 +61,8 @@ def test_ffprobe_field_order(tmp_path):
     test_mkv = get_large_test_file()
     output_path = tmp_path / test_mkv.name
     client = FFmpegClient(input_path=test_mkv, output_path=output_path, source_type="DVD")
-    ffprobe_info = client.get_ffprobe_info()
-    returned_field_order = ffprobe_info["field_order"]
+    ffprobe_info = client.probe_video()
+    returned_field_order = ffprobe_info.field_order
     assert returned_field_order == "progressive"
 
 

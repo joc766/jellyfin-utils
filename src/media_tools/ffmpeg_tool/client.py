@@ -92,6 +92,7 @@ class FFmpegClient:
 
         return {"duration": max([video_duration, audio_duration]), "field_order": field_order}
 
+    # TODO: use ffprobe to get width, height instead of the trunc bs
     def start_compress_mkv(
         self,
         overwrite: bool = False,
@@ -112,7 +113,7 @@ class FFmpegClient:
         else:
             command.append("-n")
         if self.source_type == "DVD":
-            crf = "21"
+            crf = "20"
         else:
             crf = "18"
         command.extend(["-nostdin", "-progress", "pipe:1", "-nostats"])
@@ -150,7 +151,9 @@ class FFmpegClient:
             ]
         )
         command.extend(["-maxrate", "20M", "-bufsize", "20M", "-x264-params", "interlaced=0"])
-        command.extend(["-c:a:0", "libfdk_aac", "-ac:a:0", "2", "-b:a:0", "256k"])
+        command.extend(
+            ["-c:a:0", "libfdk_aac", "-ac:a:0", "2", "-ar:a:0", "48000", "-b:a:0", "256k"]
+        )
         command.extend(
             ["-filter:a:0", "acompressor=threshold=-20dB:ratio=3,loudnorm=I=-18:TP=-1.5:LRA=10"]
         )
@@ -199,4 +202,6 @@ class FFmpegClient:
         finally:
             res = self.ffmpeg_proc.wait()
             if res != 0 and not interrupted:
-                raise RuntimeError(f"ffmpeg failed with exit code {res}")
+                raise RuntimeError(
+                    f"ffmpeg failed with exit code {res}: {self.ffmpeg_proc.stderr.read()}"
+                )

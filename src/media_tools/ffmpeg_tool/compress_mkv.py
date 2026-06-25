@@ -7,7 +7,11 @@ def compress_mkv(
     client: FFmpegClient,
     overwrite: bool = False,
     verbose: bool = False,
+    single_audio: bool = False,
     preserve_surround_track: bool = False,
+    crf: int | None = None,
+    preset: str = "slow",
+    dry_run: bool = False,
 ):
     ffprobe_info = client.get_ffprobe_info()
     duration = ffprobe_info["duration"]
@@ -19,7 +23,11 @@ def compress_mkv(
             overwrite=overwrite,
             deinterlace=deinterlace,
             verbose=verbose,
+            single_audio=single_audio,
             preserve_surround_track=preserve_surround_track,
+            crf=crf,
+            preset=preset,
+            dry_run=dry_run,
         ):
             curr_state = progress.handle_line(line)
             render.update(curr_state)

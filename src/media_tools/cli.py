@@ -172,7 +172,11 @@ def rip_disk_cmd(
 @click.option("--tv", "content_type", flag_value="tv")
 @click.option("--overwrite", "-f", "overwrite", is_flag=True)
 @click.option("--verbose", "-v", is_flag=True)
-@click.option("--preserve-surround", "-p", "preserve_surround", is_flag=True)
+@click.option("--single-audio", "single_audio", is_flag=True)
+@click.option("--preserve-surround", "preserve_surround", is_flag=True)
+@click.option("--crf", "crf", type=int, default=None)
+@click.option("--preset", "preset", type=str, default="slow")
+@click.option("--dry-run", "dry_run", is_flag=True)
 @click.pass_obj
 def compress_mkv_cmd(
     app_ctx: AppContext,
@@ -181,6 +185,10 @@ def compress_mkv_cmd(
     overwrite: bool,
     verbose: bool = False,
     preserve_surround: bool = False,
+    single_audio: bool = False,
+    crf: int | None = None,
+    preset: str = "slow",
+    dry_run: bool = False,
 ):
     compressed_storage_base = app_ctx.config.local_base / "compressed" / content_type
     raw_storage_base = app_ctx.config.local_base / "raw" / content_type
@@ -219,7 +227,11 @@ def compress_mkv_cmd(
                 client,
                 overwrite=overwrite,
                 verbose=verbose,
+                single_audio=single_audio,
                 preserve_surround_track=preserve_surround,
+                crf=crf,
+                preset=preset,
+                dry_run=dry_run,
             )
         except AssertionError as e:
             raise e

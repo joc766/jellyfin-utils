@@ -84,7 +84,7 @@ class RsyncRender:
     def update(self, new_state: RsyncState):
         description = (
             self.description
-            + f"[dim][{new_state.transfer_number}/{new_state.transfer_number + new_state.remaining_transfers}][/dim]"
+            + f" [dim][{new_state.transfer_number}/{new_state.transfer_number + new_state.remaining_transfers}][/dim]"
             if new_state.transfer_number is not None and new_state.remaining_transfers is not None
             else self.description
         )

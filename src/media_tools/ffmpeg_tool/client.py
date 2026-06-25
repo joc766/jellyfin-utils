@@ -1,4 +1,5 @@
 import re
+import shlex
 import signal
 import subprocess
 from pathlib import Path
@@ -98,6 +99,10 @@ class FFmpegClient:
         overwrite: bool = False,
         deinterlace: bool = False,
         verbose: bool = False,
+        dry_run: bool = False,
+        single_audio: bool = False,
+        crf: int | None = None,
+        preset: str = "slow",
         preserve_surround_track: bool = False,
     ):
         """
@@ -112,10 +117,11 @@ class FFmpegClient:
             command.append("-y")
         else:
             command.append("-n")
-        if self.source_type == "DVD":
-            crf = "20"
-        else:
-            crf = "18"
+        if crf is None:
+            if self.source_type == "DVD":
+                crf = 20
+            else:
+                crf = 18
         command.extend(["-nostdin", "-progress", "pipe:1", "-nostats"])
         command.extend(["-i", str(self.input_path)])
         command.extend(
@@ -124,24 +130,30 @@ class FFmpegClient:
                 "0",
                 "-map_chapters",
                 "0",
+                "-sn",
                 "-map",
                 "0:v:0",
                 "-map",
                 "0:a:0",
-                "-map",
-                "0:a:0",
                 # "0:a:m:language:eng",
-                "-sn",
             ]
         )
+        # TODO: maybe merge single-audio and preserve-surround to a better flag
+        if not single_audio:
+            command.extend(
+                [
+                    "-map",
+                    "0:a:0",
+                ]
+            )
         command.extend(
             [
                 "-c:v",
                 "libx264",
                 "-preset",
-                "slow",
+                preset,
                 "-crf",
-                crf,
+                str(crf),
                 "-pix_fmt",
                 "yuv420p",
                 "-profile:v",
@@ -150,24 +162,27 @@ class FFmpegClient:
                 "4.1",
             ]
         )
-        command.extend(["-maxrate", "20M", "-bufsize", "20M", "-x264-params", "interlaced=0"])
+        # command.extend(["-maxrate", "20M", "-bufsize", "20M", "-x264-params", "interlaced=0"])
         command.extend(
             ["-c:a:0", "libfdk_aac", "-ac:a:0", "2", "-ar:a:0", "48000", "-b:a:0", "256k"]
         )
         command.extend(
             ["-filter:a:0", "acompressor=threshold=-20dB:ratio=3,loudnorm=I=-18:TP=-1.5:LRA=10"]
         )
-        command.extend(["-c:a:1", "copy" if preserve_surround_track else "libfdk_aac"])
-        if not preserve_surround_track:
+        if not single_audio:
+            command.extend(["-c:a:1", "copy" if preserve_surround_track else "libfdk_aac"])
+        if not single_audio and not preserve_surround_track:
             command.extend(["-b:a:1", "512k"])
+        if not single_audio:
+            command.extend(["-disposition:a:1", "0"])
+            command.extend(["-metadata:s:a:1", "title=Surround 5.1"])
         command.extend(["-disposition:a:0", "default"])
-        command.extend(["-disposition:a:1", "0"])
-        command.extend(
-            ["-movflags", "+faststart", "-fflags", "+genpts", "-avoid_negative_ts", "make_zero"]
-        )
+        command.extend(["-metadata:s:a:0", "title=Stereo AAC"])
+        command.extend(["-movflags", "+faststart"])
 
         deinterlace_filter = "yadif"
         if self.source_type == "DVD":
+            command.extend(["-fflags", "+genpts", "-avoid_negative_ts", "make_zero"])
             scale_filter = "scale=trunc(480*dar/2)*2:480:flags=lanczos,setsar=1,setfield=prog"
             if deinterlace:
                 command.extend(["-vf", f"{deinterlace_filter},{scale_filter}"])
@@ -179,29 +194,28 @@ class FFmpegClient:
         command.append(str(self.output_path))
 
         if verbose and self.console is not None:
-            self.console.print(Text(" ".join(command)))
+            self.console.print(Text("+ " + shlex.join(command)))
 
-        self.ffmpeg_proc = subprocess.Popen(
-            command,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-        )
+        if not dry_run:
+            self.ffmpeg_proc = subprocess.Popen(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
 
-        assert self.ffmpeg_proc.stdout is not None
+            assert self.ffmpeg_proc.stdout is not None
 
-        interrupted = False
-        try:
-            yield from self.ffmpeg_proc.stdout
-        except KeyboardInterrupt as e:
-            interrupted = True
-            self.ffmpeg_proc.send_signal(signal.SIGINT)
-            raise InterruptedError("FFmpeg Aborted!") from e
-        finally:
-            res = self.ffmpeg_proc.wait()
-            if res != 0 and not interrupted:
-                raise RuntimeError(
-                    f"ffmpeg failed with exit code {res}: {self.ffmpeg_proc.stderr.read()}"
-                )
+            interrupted = False
+            try:
+                yield from self.ffmpeg_proc.stdout
+            except KeyboardInterrupt as e:
+                interrupted = True
+                self.ffmpeg_proc.send_signal(signal.SIGINT)
+                raise InterruptedError("FFmpeg Aborted!") from e
+            finally:
+                res = self.ffmpeg_proc.wait()
+                if res != 0 and not interrupted:
+                    raise RuntimeError(f"ffmpeg failed with exit code {res}")

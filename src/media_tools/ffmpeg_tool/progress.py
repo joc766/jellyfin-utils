@@ -39,6 +39,8 @@ class FFmpegProgress(Progress):
         yield self.make_tasks_table(self.tasks)
 
 
+# TODO: test if the progress wrapper can actually work for any generic ffmpeg command
+# Idea: put a if __name__ == main function in that reads progress from standard input!
 class FFmpegProgressRender:
     def __init__(self, title_name: str, duration: float, console: Console | None = None):
         """duration: duration in seconds"""
@@ -115,3 +117,16 @@ class FFmpegProgressTracker:
             self.state.speed = speed
 
         return self.state
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) != 2:
+        print("Usage: python progress.py [duration]", file=sys.stderr)
+        sys.exit(1)
+
+    duration = float(sys.argv[1])
+    with FFmpegProgressRender("File", duration) as render:
+        for curr_state in FFmpegProgressTracker().track_progress(sys.stdin):
+            render.update(curr_state)

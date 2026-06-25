@@ -6,7 +6,7 @@ import pytest
 from botocore import UNSIGNED
 from botocore.config import Config
 
-from media_tools.ffmpeg_tool import FFmpegClient
+from media_tools.ffmpeg_tool.client import FFmpegClient
 
 
 def get_large_test_file():

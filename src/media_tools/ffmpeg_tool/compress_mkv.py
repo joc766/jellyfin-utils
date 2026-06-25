@@ -1,5 +1,5 @@
-from .client import FFmpegClient
-from .progress import FFmpegProgressRender, FFmpegProgressTracker
+from media_tools.ffmpeg_tool.client import FFmpegClient
+from media_tools.ffmpeg_tool.progress import FFmpegProgressRender, FFmpegProgressTracker
 
 
 # TODO: add dry-run parameter for easier testing and planning

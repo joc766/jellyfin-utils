@@ -184,9 +184,13 @@ class RsyncClient:
         contents_only: bool = False,
         dry_run: bool = False,
     ) -> list[str]:
+        # TODO: make -W option a cli flag
+        # TODO: investigate why progress is at 40% when almost done?
+        #   - Options: per-file progress stats or explicit selection of which files to sync instead of entire dir
+        #       - Could make it appear more similar to MakeMKV progress in that case
         rsync_cmd = [
             "rsync",
-            "-rth",
+            "-rthW",
         ]
         # filter rules
         rsync_cmd.extend(

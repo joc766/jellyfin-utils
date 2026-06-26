@@ -129,7 +129,7 @@ def rip_disk_cmd(
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--single-audio", "single_audio", is_flag=True)
 @click.option("--preserve-surround", "preserve_surround", is_flag=True)
-@click.option("--crf", "crf", type=int, default=None)
+@click.option("--crf", "crf", type=int, default=18)
 @click.option("--preset", "preset", type=str, default="slow")
 @click.option("--dry-run", "dry_run", is_flag=True)
 @click.pass_obj

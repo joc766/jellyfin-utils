@@ -8,28 +8,35 @@ version = "0.0.1"
 description = "Utilities to manage jellyfin server"
 readme = "README.md"
 requires-python = ">= 3.10"
-authors = [{name = "Jack O'Connor",email= "coders-alcoves.7x@icloud.com"}]
+authors = [{ name = "Jack O'Connor", email = "coders-alcoves.7x@icloud.com" }]
 dependencies = [
   "rich>=15.0.0",
   "python-dotenv>=1.2.2",
   "click>8.3.3",
   "inquirerpy>=0.3.4",
   "requests>=2.34.0",
-  "paramiko>=5.0.0"
+  "paramiko>=5.0.0",
 ]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "boto3"]
+dev = ["pytest", "boto3", "sqlfluff"]
 
 [project.scripts]
 media-tools = "media_tools.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.sqlfluff.core]
+dialect = "sqlite"
+templater = "raw"
+
+[tool.sqlfluff.indentation]
+tab_space_size = 4
 
 [tool.ruff]
 line-length = 100
@@ -43,6 +50,4 @@ ignore = ["E501"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-m 'not slow'"
-markers = [
-  "slow: tests that are long-running and therefore optional",
-]
+markers = ["slow: tests that are long-running and therefore optional"]

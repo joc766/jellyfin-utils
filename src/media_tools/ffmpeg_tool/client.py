@@ -19,6 +19,7 @@ def create_ffmpeg_compress_cmd(
     overwrite: bool = False,
     deinterlace: bool = False,
     single_audio: bool = False,
+    height: int | None = None,
     crf: int | None = None,
     preset: str = "slow",
     preserve_surround_track: bool = False,
@@ -28,12 +29,9 @@ def create_ffmpeg_compress_cmd(
         command.append("-y")
     else:
         command.append("-n")
-    if crf is None:
-        if source_type == "DVD":
-            crf = 20
-        else:
-            crf = 18
     command.extend(["-nostdin", "-progress", "pipe:1", "-nostats"])
+
+    # INPUT MAPPINGS
     command.extend(["-i", str(input_path)])
     command.extend(
         [
@@ -57,6 +55,14 @@ def create_ffmpeg_compress_cmd(
                 "0:a:0",
             ]
         )
+
+    # VIDEO CODECS
+    if crf is None:
+        if source_type == "DVD":
+            crf = 20
+        else:
+            crf = 18
+
     command.extend(
         [
             "-c:v",
@@ -73,33 +79,53 @@ def create_ffmpeg_compress_cmd(
             "4.1",
         ]
     )
-    # command.extend(["-maxrate", "20M", "-bufsize", "20M", "-x264-params", "interlaced=0"])
+
+    # VIDEO FILTERS
+    scale_filter = f"scale=-2:{height}:flags=lanczos" if height is not None else None
+    setsar_filter = None
+    setfield_filter = "setfield=prog" if deinterlace else None
+    deinterlace_filter = "yadif" if deinterlace else None
+
+    if source_type == "DVD":
+        setsar_filter = "setsar=1"
+        height = 480
+        # no reason to go lower than 480p, height parameter does not apply
+        scale_filter = f"scale=round({height}*dar/2)*2:{height}:flags=lanczos"
+
+    video_filters = [
+        f
+        for f in (deinterlace_filter, scale_filter, setsar_filter, setfield_filter)
+        if f is not None
+    ]
+
+    if len(video_filters) > 0:
+        command.extend(["-vf", ",".join(video_filters)])
+
+    # AUDIO CODECS
     command.extend(["-c:a:0", "libfdk_aac", "-ac:a:0", "2", "-ar:a:0", "48000", "-b:a:0", "256k"])
-    command.extend(
-        ["-filter:a:0", "acompressor=threshold=-20dB:ratio=3,loudnorm=I=-18:TP=-1.5:LRA=10"]
-    )
     if not single_audio:
         command.extend(["-c:a:1", "copy" if preserve_surround_track else "libfdk_aac"])
     if not single_audio and not preserve_surround_track:
-        command.extend(["-b:a:1", "512k"])
+        command.extend(["-b:a:1", "512k", "-ac:a:1", "6"])
+
+    # AUDIO FILTERS (Stereo)
+    command.extend(
+        ["-filter:a:0", "acompressor=threshold=-20dB:ratio=3,loudnorm=I=-18:TP=-1.5:LRA=10"]
+    )
+
+    # AUDIO METADATA
     if not single_audio:
         command.extend(["-disposition:a:1", "0"])
         command.extend(["-metadata:s:a:1", "title=Surround 5.1"])
     command.extend(["-disposition:a:0", "default"])
     command.extend(["-metadata:s:a:0", "title=Stereo AAC"])
+
+    # MOVFLAGS
     command.extend(["-movflags", "+faststart"])
 
-    deinterlace_filter = "yadif"
+    # DVD: align timestamps correctly
     if source_type == "DVD":
         command.extend(["-fflags", "+genpts", "-avoid_negative_ts", "make_zero"])
-        scale_filter = "scale=trunc(480*dar/2)*2:480:flags=lanczos,setsar=1,setfield=prog"
-        if deinterlace:
-            command.extend(["-vf", f"{deinterlace_filter},{scale_filter}"])
-        else:
-            command.extend(["-vf", scale_filter])
-    elif deinterlace:
-        command.extend(["-vf", deinterlace_filter])
-
     command.append(str(output_path))
 
     return command
@@ -197,6 +223,7 @@ class FFmpegClient:
         verbose: bool = False,
         dry_run: bool = False,
         single_audio: bool = False,
+        height: int | None = None,
         crf: int | None = None,
         preset: str = "slow",
         preserve_surround_track: bool = False,
@@ -217,6 +244,7 @@ class FFmpegClient:
             overwrite=overwrite,
             deinterlace=deinterlace,
             single_audio=single_audio,
+            height=height,
             crf=crf,
             preset=preset,
             preserve_surround_track=preserve_surround_track,

@@ -129,7 +129,8 @@ def rip_disk_cmd(
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--single-audio", "single_audio", is_flag=True)
 @click.option("--preserve-surround", "preserve_surround", is_flag=True)
-@click.option("--crf", "crf", type=int, default=18)
+@click.option("--height", "height", type=int, default=None)
+@click.option("--crf", "crf", type=int, default=None)
 @click.option("--preset", "preset", type=str, default="slow")
 @click.option("--dry-run", "dry_run", is_flag=True)
 @click.pass_obj
@@ -141,6 +142,7 @@ def compress_mkv_cmd(
     verbose: bool = False,
     preserve_surround: bool = False,
     single_audio: bool = False,
+    height: int | None = None,
     crf: int | None = None,
     preset: str = "slow",
     dry_run: bool = False,
@@ -184,6 +186,7 @@ def compress_mkv_cmd(
                 verbose=verbose,
                 single_audio=single_audio,
                 preserve_surround_track=preserve_surround,
+                height=height,
                 crf=crf,
                 preset=preset,
                 dry_run=dry_run,

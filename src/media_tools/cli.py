@@ -100,7 +100,7 @@ def organize_cmd(app_ctx: AppContext, imdb_id: str, content_type: str):
                         content_base, title_file, title_type, omdb_title, omdb_year, imdb_id
                     )
     except Exception as e:
-        raise click.ClickException(str(e)) from e
+        raise e
 
 
 @cli.command("rip")
@@ -117,7 +117,7 @@ def rip_disk_cmd(
         client = MakeMKVClient(output_base=output_base, console=app_ctx.console)
         rip_disk(client, verbose=verbose, debug=debug, console=app_ctx.console)
     except Exception as e:
-        raise click.ClickException(str(e)) from e
+        raise e
 
 
 @cli.command("compress")
@@ -194,7 +194,7 @@ def compress_mkv_cmd(
         except AssertionError as e:
             raise e
         except Exception as e:
-            raise click.ClickException(str(e)) from e
+            raise e
 
 
 @cli.command("upload")
@@ -224,7 +224,7 @@ def upload_to_server(
     except AssertionError as e:
         raise e
     except Exception as e:
-        raise click.ClickException(str(e)) from e
+        raise e
 
 
 @cli.command("download")
@@ -254,7 +254,7 @@ def download_from_server(
     except AssertionError as e:
         raise e
     except Exception as e:
-        raise click.ClickException(str(e)) from e
+        raise e
 
 
 @cli.command("find-missing-raw")

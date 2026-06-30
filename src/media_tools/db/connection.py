@@ -24,16 +24,21 @@ def get_datetime() -> datetime:
 
 
 def create_new_request(
-    cli_cmd: str, cli_params: dict[str, Any], exc_cmd: str, pid: int, db_path: Path | None = None
+    cli_cmd: str,
+    cli_params: dict[str, Any],
+    exc_cmd: str,
+    pid: int,
+    parent_pid: int,
+    db_path: Path | None = None,
 ) -> int:
     with connect(db_path) as conn:
         curr_dt = get_datetime().strftime(DT_FORMAT)
         cursor = conn.execute(
             """
-            INSERT INTO request (cli_cmd, cli_params, exc_cmd, start_time, pid)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO request (cli_cmd, cli_params, exc_cmd, start_time, pid, parent_pid)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (cli_cmd, json.dumps(cli_params), exc_cmd, curr_dt, pid),
+            (cli_cmd, json.dumps(cli_params), exc_cmd, curr_dt, pid, parent_pid),
         )
         request_id = cursor.lastrowid
         if request_id is not None:

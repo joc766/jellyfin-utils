@@ -1,4 +1,5 @@
 import json
+import os
 import shlex
 import signal
 import subprocess
@@ -259,7 +260,11 @@ class FFmpegClient:
             try:
                 # log to db
                 request_id = create_new_request(
-                    "compress", params_dict, command_str, self.ffmpeg_proc.pid
+                    cli_cmd="compress",
+                    cli_params=params_dict,
+                    exc_cmd=command_str,
+                    pid=self.ffmpeg_proc.pid,
+                    parent_pid=os.getpid(),
                 )
             except Exception as e:
                 self.ffmpeg_proc.send_signal(signal.SIGTERM)

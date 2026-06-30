@@ -32,7 +32,13 @@ def test_init_db(tmp_path):
     )
     shell_cmd_str = shlex.join(shell_cmd)
     pid = 9999
+    parent_pid = 9998
     request_id = create_new_request(
-        cli_cmd="compress", cli_params=params, exc_cmd=shell_cmd_str, db_path=db_path, pid=pid
+        cli_cmd="compress",
+        cli_params=params,
+        exc_cmd=shell_cmd_str,
+        db_path=db_path,
+        pid=pid,
+        parent_pid=parent_pid,
     )
     complete_request(request_id, 0, db_path=db_path)

@@ -28,17 +28,17 @@ def create_ffmpeg_compress_cmd(
     preset: str = "slow",
     preserve_surround_track: bool = False,
 ):
-    command = [executable]
-    command.extend(["-v", "error"])
+    compress_command = [executable]
+    compress_command.extend(["-v", "error"])
     if overwrite:
-        command.append("-y")
+        compress_command.append("-y")
     else:
-        command.append("-n")
-    command.extend(["-nostdin", "-progress", "pipe:1", "-nostats"])
+        compress_command.append("-n")
+    compress_command.extend(["-nostdin", "-progress", "pipe:1", "-nostats"])
 
     # INPUT MAPPINGS
-    command.extend(["-i", str(input_path)])
-    command.extend(
+    compress_command.extend(["-i", str(input_path)])
+    compress_command.extend(
         [
             "-map_metadata",
             "0",
@@ -54,7 +54,7 @@ def create_ffmpeg_compress_cmd(
     )
     # TODO: maybe merge single-audio and preserve-surround to a better flag
     if not single_audio:
-        command.extend(
+        compress_command.extend(
             [
                 "-map",
                 "0:a:0",
@@ -68,7 +68,7 @@ def create_ffmpeg_compress_cmd(
         else:
             crf = 18
 
-    command.extend(
+    compress_command.extend(
         [
             "-c:v",
             "libx264",
@@ -104,36 +104,38 @@ def create_ffmpeg_compress_cmd(
     ]
 
     if len(video_filters) > 0:
-        command.extend(["-vf", ",".join(video_filters)])
+        compress_command.extend(["-vf", ",".join(video_filters)])
 
     # AUDIO CODECS
-    command.extend(["-c:a:0", "libfdk_aac", "-ac:a:0", "2", "-ar:a:0", "48000", "-b:a:0", "256k"])
+    compress_command.extend(
+        ["-c:a:0", "libfdk_aac", "-ac:a:0", "2", "-ar:a:0", "48000", "-b:a:0", "256k"]
+    )
     if not single_audio:
-        command.extend(["-c:a:1", "copy" if preserve_surround_track else "libfdk_aac"])
+        compress_command.extend(["-c:a:1", "copy" if preserve_surround_track else "libfdk_aac"])
     if not single_audio and not preserve_surround_track:
-        command.extend(["-b:a:1", "512k", "-ac:a:1", "6"])
+        compress_command.extend(["-b:a:1", "512k", "-ac:a:1", "6"])
 
     # AUDIO FILTERS (Stereo)
-    command.extend(
+    compress_command.extend(
         ["-filter:a:0", "acompressor=threshold=-20dB:ratio=3,loudnorm=I=-18:TP=-1.5:LRA=10"]
     )
 
     # AUDIO METADATA
     if not single_audio:
-        command.extend(["-disposition:a:1", "0"])
-        command.extend(["-metadata:s:a:1", "title=Surround 5.1"])
-    command.extend(["-disposition:a:0", "default"])
-    command.extend(["-metadata:s:a:0", "title=Stereo AAC"])
+        compress_command.extend(["-disposition:a:1", "0"])
+        compress_command.extend(["-metadata:s:a:1", "title=Surround 5.1"])
+    compress_command.extend(["-disposition:a:0", "default"])
+    compress_command.extend(["-metadata:s:a:0", "title=Stereo AAC"])
 
     # MOVFLAGS
-    command.extend(["-movflags", "+faststart"])
+    compress_command.extend(["-movflags", "+faststart"])
 
     # DVD: align timestamps correctly
     if source_type == "DVD":
-        command.extend(["-fflags", "+genpts", "-avoid_negative_ts", "make_zero"])
-    command.append(str(output_path))
+        compress_command.extend(["-fflags", "+genpts", "-avoid_negative_ts", "make_zero"])
+    compress_command.append(str(output_path))
 
-    return command
+    return compress_command
 
 
 class FFmpegClient:
@@ -151,7 +153,6 @@ class FFmpegClient:
         self.input_path = input_path
         self.output_path = output_path
         self.console = console
-        self.ffmpeg_proc = None
 
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
@@ -228,7 +229,7 @@ class FFmpegClient:
         if not overwrite and self.output_path.exists():
             raise FileExistsError(f"overwrite=False and {self.output_path} already exists.")
 
-        command = create_ffmpeg_compress_cmd(
+        compress_command = create_ffmpeg_compress_cmd(
             executable=self.executable,
             input_path=self.input_path,
             output_path=self.output_path,
@@ -241,47 +242,47 @@ class FFmpegClient:
             preset=preset,
             preserve_surround_track=preserve_surround_track,
         )
-        command_str = shlex.join(command)
+        compress_command_str = shlex.join(compress_command)
 
         if verbose and self.console is not None:
-            self.console.print(Text("+ " + command_str))
+            self.console.print(Text("+ " + compress_command_str))
 
         if not dry_run:
-            self.ffmpeg_proc = subprocess.Popen(
-                command,
+            ffmpeg_proc = subprocess.Popen(
+                compress_command,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
             )
-            assert self.ffmpeg_proc.stdout is not None
-            assert self.ffmpeg_proc.stderr is not None
+            assert ffmpeg_proc.stdout is not None
+            assert ffmpeg_proc.stderr is not None
 
             try:
                 # log to db
                 request_id = create_new_request(
                     cli_cmd="compress",
                     cli_params=params_dict,
-                    exc_cmd=command_str,
-                    pid=self.ffmpeg_proc.pid,
+                    exc_cmd=compress_command_str,
+                    pid=ffmpeg_proc.pid,
                     parent_pid=os.getpid(),
                 )
             except Exception as e:
-                self.ffmpeg_proc.send_signal(signal.SIGTERM)
+                ffmpeg_proc.send_signal(signal.SIGTERM)
                 raise e
 
             interrupted = False
             try:
-                yield from self.ffmpeg_proc.stdout
+                yield from ffmpeg_proc.stdout
             except KeyboardInterrupt as e:
+                ffmpeg_proc.send_signal(signal.SIGINT)
                 interrupted = True
-                self.ffmpeg_proc.send_signal(signal.SIGINT)
                 raise InterruptedError("FFmpeg Aborted!") from e
             finally:
-                res = self.ffmpeg_proc.wait()
+                res = ffmpeg_proc.wait()
                 if res != 0 and not interrupted:
-                    complete_request(request_id, res, self.ffmpeg_proc.stderr.read(1000))
+                    complete_request(request_id, res, ffmpeg_proc.stderr.read(1000))
                     raise RuntimeError(f"ffmpeg failed with exit code {res}")
                 else:
                     complete_request(request_id, res)

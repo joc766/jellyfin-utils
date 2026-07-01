@@ -1,5 +1,6 @@
 import codecs
 import re
+import shlex
 import signal
 import subprocess
 from collections import defaultdict
@@ -8,6 +9,7 @@ from pathlib import Path
 from typing import IO
 
 from rich.console import Console
+from rich.text import Text
 
 from .models import (
     ContentFormat,
@@ -137,20 +139,33 @@ class RsyncClient:
     def _sync(
         self,
         subdir: str | None = None,
+        rel_file_path: Path | None = None,
         contents_only: bool = False,
         dry_run: bool = False,
         debug: bool = False,
     ) -> Generator[str, None, None]:
 
         src_root, dest = self._get_src_and_dest()
+
+        if subdir is not None and rel_file_path is not None:
+            raise ValueError("subdir and rel_file_path are mutually exclusive.")
+
         if subdir is None:
-            src = src_root
+            if rel_file_path is None:
+                src = src_root
+            else:
+                src = RsyncLocation(
+                    src_root.path / rel_file_path, host=src_root.host, user=src_root.user
+                )
+                dest = RsyncLocation(dest.path / rel_file_path.parent, dest.host, dest.user)
+                if self.direction == "download":
+                    dest.path.mkdir(parents=True, exist_ok=True)
         else:
             src = RsyncLocation(src_root.path / subdir, host=src_root.host, user=src_root.user)
 
         rsync_cmd = self.generate_command(src, dest, contents_only=contents_only, dry_run=dry_run)
         if debug:
-            print(rsync_cmd)
+            self.console.print(Text("+ " + shlex.join(rsync_cmd)))
         self.rsync_proc = subprocess.Popen(
             rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0, text=False
         )
@@ -176,6 +191,11 @@ class RsyncClient:
     def sync_subdir(self, subdir: str, dry_run: bool = False, debug: bool = False):
         """Sync a subdirectory of local_base to jellyfin_base"""
         return self._sync(subdir=subdir, contents_only=False, dry_run=dry_run, debug=debug)
+
+    def sync_file(self, rel_file_path: Path, dry_run: bool = False, debug: bool = False):
+        return self._sync(
+            rel_file_path=rel_file_path, contents_only=False, dry_run=dry_run, debug=debug
+        )
 
     def generate_command(
         self,

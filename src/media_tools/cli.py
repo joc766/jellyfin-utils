@@ -12,13 +12,13 @@ from InquirerPy.prompts.rawlist import RawlistPrompt
 from prompt_toolkit.validation import ValidationError, Validator
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
+from media_tools.config import AppContext, load_config
 from media_tools.ffmpeg_tool.client import FFmpegClient
 from media_tools.ffmpeg_tool.compress_mkv import compress_mkv
-
-from .config import AppContext, load_config
-from .makemkv_tool import MakeMKVClient, rip_disk
-from .omdb_tool import (
+from media_tools.makemkv_tool import MakeMKVClient, rip_disk
+from media_tools.omdb_tool import (
     MovieTitleOptions,
     OmdbClient,
     TvTitleOptions,
@@ -26,11 +26,16 @@ from .omdb_tool import (
     organize_movie_title,
     organize_tv_title,
 )
-from .rsync_tool import ContentFormat, ContentType, RsyncClient, interactive_sync
-from .sftp_tool import JellyfinSFTPClient, get_imdb_id
+from media_tools.rsync_tool.client import RsyncClient
+from media_tools.rsync_tool.models import ContentFormat, ContentType
+from media_tools.rsync_tool.progress import RsyncProgressTracker
+from media_tools.rsync_tool.render import RsyncRender
+from media_tools.sftp_tool import JellyfinSFTPClient, get_imdb_id
 
-# TODO: add a setup command to create a config with
-# TODO: command to eject disk tray (with default /dev/disk6)
+# TODO: add commands to suppress progress tracking
+# TODO: log files
+# TODO: move functions to separate module and just add them as commands
+
 
 class AllowedValuesValidator(Validator):
     def __init__(self, allowed_values: set):
@@ -267,6 +272,8 @@ def compress_mkv_cmd(
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
 @click.option("--debug", "debug", is_flag=True)
+@click.option("--dry-run", "dry_run", is_flag=True)
+@click.option("--silent", "silent", is_flag=True)
 @click.pass_obj
 def upload_to_server(
     app_ctx: AppContext,
@@ -274,6 +281,8 @@ def upload_to_server(
     content_format: ContentFormat,
     verbose: bool,
     debug: bool,
+    dry_run: bool,
+    silent: bool,
 ):
     client = RsyncClient.from_config(
         app_ctx.config,
@@ -283,7 +292,100 @@ def upload_to_server(
         content_type=content_type,
     )
     try:
-        interactive_sync(client, verbose=verbose, debug=debug)
+        if verbose:
+            client.console.print(f"src: {client.src.render()}\ndest: {client.dest.render()}")
+        content_to_sync = client.get_new_files(debug=debug)
+        # TODO: make table transient
+        table = Table(
+            title=f"{client.content_format.capitalize()} {client.content_type.capitalize()}s found in src not on server",
+            show_lines=True,
+        )
+        table.add_column("movie_name", style="magenta")
+        table.add_column("file_name", style="cyan")
+        table.add_column("changes_detected", style="yellow")
+        table.add_column("file_size", style="purple")
+
+        table_data = []
+        for movie_title, file_info in content_to_sync.items():
+            for file_name, changes in file_info.items():
+                table_data.append([movie_title, file_name, changes.description, changes.size])
+
+        if len(table_data) == 0:
+            client.console.print(
+                f"No {client.content_format} {client.content_type} in src not on dest"
+            )
+            return
+
+        sorted_table_data = sorted(table_data, key=lambda x: (x[0], x[2]))
+
+        for row in sorted_table_data:
+            formatted_row = [Text(x) for x in row]
+            table.add_row(*formatted_row)
+
+        client.console.print(table)
+
+        match content_type:
+            case "movie":
+                selected = CheckboxPrompt(
+                    message="Select titles to sync",
+                    choices=list(content_to_sync.keys()),
+                    instruction="Use space to select, enter to confirm.",
+                    vi_mode=True,
+                ).execute()
+                for folder_name in selected:
+                    progress = RsyncProgressTracker(
+                        title_name=folder_name, direction=client.direction
+                    )
+                    if not silent:
+                        with RsyncRender(
+                            title_name=folder_name,
+                            direction=client.direction,
+                            console=client.console,
+                        ) as render:
+                            for curr_state in progress.track(
+                                client.sync_subdir(folder_name, debug=debug, dry_run=dry_run),
+                                verbose=verbose,
+                            ):
+                                render.update(curr_state)
+                    else:
+                        client.sync_subdir(folder_name, debug=debug, dry_run=dry_run)
+
+            case "tv":
+                selected_show = ListPrompt(
+                    message="Select show to sync:",
+                    choices=list(content_to_sync.keys()),
+                    instruction="Use space to select, enter to confirm",
+                    vi_mode=True,
+                ).execute()
+                show_info = content_to_sync[selected_show]
+                selected_episodes = CheckboxPrompt(
+                    message="Select episodes to sync:",
+                    choices=list(show_info.keys()),
+                    instruction="Use space to select, enter to confirm",
+                    vi_mode=True,
+                ).execute()
+
+                selected = [Path(f"{selected_show}/{episode}") for episode in selected_episodes]
+                for title_path in selected:
+                    progress = RsyncProgressTracker(
+                        title_name=str(title_path), direction=client.direction
+                    )
+                    if not silent:
+                        with RsyncRender(
+                            title_name=str(title_path),
+                            direction=client.direction,
+                            console=client.console,
+                        ) as render:
+                            for curr_state in progress.track(
+                                client.sync_file(
+                                    rel_file_path=title_path, debug=debug, dry_run=dry_run
+                                ),
+                                verbose=verbose,
+                            ):
+                                render.update(curr_state)
+                    else:
+                        client.sync_file(rel_file_path=title_path, debug=debug, dry_run=dry_run)
+
     except AssertionError as e:
         raise e
     except Exception as e:
@@ -297,6 +399,8 @@ def upload_to_server(
 @click.option("--raw", "content_format", flag_value="raw", type=str)
 @click.option("--verbose", "-v", "verbose", is_flag=True)
 @click.option("--debug", "debug", is_flag=True)
+@click.option("--dry-run", "dry_run", is_flag=True)
+@click.option("--silent", "silent", is_flag=True)
 @click.pass_obj
 def download_from_server(
     app_ctx: AppContext,
@@ -304,6 +408,8 @@ def download_from_server(
     content_format: ContentFormat,
     verbose: bool = False,
     debug: bool = False,
+    dry_run: bool = False,
+    silent: bool = False,
 ):
     client = RsyncClient.from_config(
         app_ctx.config,
@@ -313,7 +419,100 @@ def download_from_server(
         content_type=content_type,
     )
     try:
-        interactive_sync(client, verbose=verbose, debug=debug)
+        if verbose:
+            client.console.print(f"src: {client.src.render()}\ndest: {client.dest.render()}")
+        content_to_sync = client.get_new_files(debug=debug)
+        # TODO: make table transient
+        table = Table(
+            title=f"{client.content_format.capitalize()} {client.content_type.capitalize()}s found in src not on server",
+            show_lines=True,
+        )
+        table.add_column("movie_name", style="magenta")
+        table.add_column("file_name", style="cyan")
+        table.add_column("changes_detected", style="yellow")
+        table.add_column("file_size", style="purple")
+
+        table_data = []
+        for movie_title, file_info in content_to_sync.items():
+            for file_name, changes in file_info.items():
+                table_data.append([movie_title, file_name, changes.description, changes.size])
+
+        if len(table_data) == 0:
+            client.console.print(
+                f"No {client.content_format} {client.content_type} in src not on dest"
+            )
+            return
+
+        sorted_table_data = sorted(table_data, key=lambda x: (x[0], x[2]))
+
+        for row in sorted_table_data:
+            formatted_row = [Text(x) for x in row]
+            table.add_row(*formatted_row)
+
+        client.console.print(table)
+
+        match content_type:
+            case "movie":
+                selected = CheckboxPrompt(
+                    message="Select movies to sync:",
+                    choices=list(content_to_sync.keys()),
+                    instruction="Use space to select, enter to confirm.",
+                    vi_mode=True,
+                ).execute()
+                for title_path in selected:
+                    progress = RsyncProgressTracker(
+                        title_name=title_path, direction=client.direction
+                    )
+                    if not silent:
+                        with RsyncRender(
+                            title_name=title_path,
+                            direction=client.direction,
+                            console=client.console,
+                        ) as render:
+                            for curr_state in progress.track(
+                                client.sync_subdir(subdir=title_path, debug=debug, dry_run=dry_run),
+                                verbose=verbose,
+                            ):
+                                render.update(curr_state)
+                    else:
+                        client.sync_subdir(subdir=title_path, debug=debug, dry_run=dry_run)
+
+            case "tv":
+                selected_show = ListPrompt(
+                    message="Select show to sync:",
+                    choices=list(content_to_sync.keys()),
+                    instruction="Use space to select, enter to confirm",
+                    vi_mode=True,
+                ).execute()
+                show_info = content_to_sync[selected_show]
+                selected_episodes = CheckboxPrompt(
+                    message="Select episodes to sync:",
+                    choices=list(show_info.keys()),
+                    instruction="Use space to select, enter to confirm",
+                    vi_mode=True,
+                ).execute()
+
+                selected = [Path(f"{selected_show}/{episode}") for episode in selected_episodes]
+                for title_path in selected:
+                    progress = RsyncProgressTracker(
+                        title_name=str(title_path), direction=client.direction
+                    )
+                    if not silent:
+                        with RsyncRender(
+                            title_name=str(title_path),
+                            direction=client.direction,
+                            console=client.console,
+                        ) as render:
+                            for curr_state in progress.track(
+                                client.sync_file(
+                                    rel_file_path=title_path, debug=debug, dry_run=dry_run
+                                ),
+                                verbose=verbose,
+                            ):
+                                render.update(curr_state)
+                    else:
+                        client.sync_file(rel_file_path=title_path, debug=debug, dry_run=dry_run)
+
     except AssertionError as e:
         raise e
     except Exception as e:

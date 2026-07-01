@@ -261,6 +261,8 @@ def compress_mkv_cmd(
             )
         except AssertionError as e:
             raise e
+        except (RuntimeError, FileExistsError, InterruptedError) as e:
+            raise click.ClickException(str(e)) from e
         except Exception as e:
             raise e
 

@@ -29,6 +29,7 @@ def create_ffmpeg_compress_cmd(
     preserve_surround_track: bool = False,
 ):
     command = [executable]
+    command.extend(["-v", "error"])
     if overwrite:
         command.append("-y")
     else:

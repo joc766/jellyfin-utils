@@ -1,8 +1,13 @@
+import os
+import shlex
 import signal
 import subprocess
 from pathlib import Path
 
 from rich.console import Console
+from rich.text import Text
+
+from media_tools.db.connection import complete_request, create_new_request
 
 from .info_parser import MakeMKVInfoParser
 
@@ -81,10 +86,12 @@ class MakeMKVClient:
         assert hasattr(self.disc_info, "disc_type")
         return 512 if self.disc_info.disc_type == "DVD" else 1024
 
-    def run_makemkv(self, title_id: int | None = None, verbose: bool = False, debug: bool = False):
+    def run_makemkv(self, title_id: int | None = None, debug: bool = False):
         assert self.disc_info is not None
         assert hasattr(self.disc_info, "disc_title")
         assert hasattr(self, "output_path")
+
+        params_dict = {k: v for k, v in locals().items() if k != "self"}
 
         if not self.output_path.exists():
             self.output_path.mkdir()
@@ -103,12 +110,16 @@ class MakeMKVClient:
             f"--cache={self.cache_size}",
             self.drive_name,
             title,
-            self.output_path,
+            str(self.output_path),
             "--progress=-stdout",
             "--messages=-same",
         ]
+
+        mkv_command_str = shlex.join(mkv_command)
+
         if debug:
-            self.console.print(mkv_command)
+            self.console.print(Text("+ " + mkv_command_str))
+
         mkv_proc = subprocess.Popen(
             mkv_command,
             stdout=subprocess.PIPE,
@@ -119,17 +130,30 @@ class MakeMKVClient:
 
         assert mkv_proc.stdout is not None
 
+        try:
+            # log to db
+            request_id = create_new_request(
+                cli_cmd="rip",
+                cli_params=params_dict,
+                exc_cmd=mkv_command_str,
+                pid=mkv_proc.pid,
+                parent_pid=os.getpid(),
+            )
+
+        except Exception as e:
+            mkv_proc.send_signal(signal.SIGTERM)
+            raise e
+
         interrupted = False
         try:
-            for line in mkv_proc.stdout:
-                if verbose:
-                    self.console.print(line)
-                yield line
+            yield from mkv_proc.stdout
         except KeyboardInterrupt as e:
             mkv_proc.send_signal(signal.SIGINT)
             interrupted = True
             raise InterruptedError("MakeMKV aborted!") from e
         finally:
             res = mkv_proc.wait()
+            # TODO: makemkvcon does not output anything to stderr, so there will be no informative error messages. However, robust logging MSG details will likely fix this issue
+            complete_request(request_id, res)
             if res != 0 and not interrupted:
                 raise RuntimeError(f"makemkvcon failed with exit code {res}")

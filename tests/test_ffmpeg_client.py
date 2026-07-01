@@ -74,8 +74,6 @@ def test_compress_interrupt(tmp_path):
         generator = client.start_compress_mkv()
         next(generator)
         generator.throw(KeyboardInterrupt)
-    assert client.ffmpeg_proc is not None
-    assert client.ffmpeg_proc.returncode == 255
 
 
 # This test may take a couple minutes

@@ -11,7 +11,8 @@ class MakeMKVProgressTracker:
     PROG_TASK_COMPLETE_PATTERN = re.compile("^MSG:5011")
 
     # init method for when a stdout can be passed directly
-    def __init__(self) -> None:
+    def __init__(self, verbose: bool = False) -> None:
+        self.verbose = verbose
         self.state = MakeMKVProgressState(
             prog_total=None,
             prog_curr=None,
@@ -20,13 +21,15 @@ class MakeMKVProgressTracker:
             status="Preparing MakeMKV",
         )
 
-    def track_progress(self, proc: IO, verbose: bool = False):
+    def track_progress(self, proc: IO):
         for line in proc:
-            if verbose:
+            if self.verbose:
                 print(line)
             yield self.handle_line(line)
 
     def handle_line(self, line) -> MakeMKVProgressState:
+        if self.verbose:
+            print(line)
         line = line.rstrip("\n")
         if line[0:5] in ("PRGT:", "PRGC:", "PRGV:"):
             event = self.parse_line(line)

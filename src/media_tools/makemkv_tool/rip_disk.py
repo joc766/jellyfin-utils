@@ -40,7 +40,7 @@ def rip_disk(
     if console is None:
         console = Console()
 
-    progress_tracker = MakeMKVProgressTracker()
+    progress_tracker = MakeMKVProgressTracker(verbose=verbose)
     with MakeMKVProgressRenderer(console=console) as renderer:
         progress_tracker.update_status(
             "Running [repr.filename]makemkvcon info[/repr.filename] (drive info)"
@@ -83,6 +83,6 @@ def rip_disk(
             progress_tracker.update_status(
                 f"Ripping {title.title_name} [dim][{i + 1}/{len(titles_to_rip)}][/dim]"
             )
-            for line in client.run_makemkv(title_id=title.title_id, verbose=verbose, debug=debug):
+            for line in client.run_makemkv(title_id=title.title_id, debug=debug):
                 curr_state = progress_tracker.handle_line(line)
                 renderer.update(curr_state)

@@ -33,34 +33,32 @@ def test_file_exists(tmp_path: Path):
         dummy_input.touch()
         test_path = tmp_path / "existing_file.mp4"
         test_path.touch()
-        client = FFmpegClient(input_path=dummy_input, output_path=test_path)
+        client = FFmpegClient(input_path=dummy_input)
         # iterate through generator
-        list(client.start_compress_mkv(overwrite=False))
+        list(client.start_compress_mkv(output_path=test_path, overwrite=False))
 
 
 def test_file_not_exists(tmp_path: Path):
     with pytest.raises(FileNotFoundError):
         dummy_input = tmp_path / "input.mkv"
         test_path = tmp_path / "existing_file.mp4"
-        client = FFmpegClient(input_path=dummy_input, output_path=test_path)
+        client = FFmpegClient(input_path=dummy_input)
         # iterate through generator
-        list(client.start_compress_mkv())
+        list(client.start_compress_mkv(output_path=test_path))
 
 
-def test_ffprobe_duration(tmp_path):
+def test_ffprobe_duration():
     test_mkv = get_large_test_file()
-    output_path = tmp_path / test_mkv.name
-    client = FFmpegClient(input_path=test_mkv, output_path=output_path, source_type="DVD")
+    client = FFmpegClient(input_path=test_mkv, source_type="DVD")
     correct_duration = datetime.timedelta(seconds=147, microseconds=213733)
     ffprobe_info = client.probe_video()
     returned_duration = ffprobe_info.tags.duration_eng
     assert correct_duration == returned_duration
 
 
-def test_ffprobe_field_order(tmp_path):
+def test_ffprobe_field_order():
     test_mkv = get_large_test_file()
-    output_path = tmp_path / test_mkv.name
-    client = FFmpegClient(input_path=test_mkv, output_path=output_path, source_type="DVD")
+    client = FFmpegClient(input_path=test_mkv, source_type="DVD")
     ffprobe_info = client.probe_video()
     returned_field_order = ffprobe_info.field_order
     assert returned_field_order == "progressive"
@@ -68,10 +66,10 @@ def test_ffprobe_field_order(tmp_path):
 
 def test_compress_interrupt(tmp_path):
     test_mkv = get_large_test_file()
-    output = tmp_path / "test-small-mkv.mkv"
-    client = FFmpegClient(input_path=test_mkv, output_path=output, source_type="DVD")
+    output_path = tmp_path / "test-small-mkv.mkv"
+    client = FFmpegClient(input_path=test_mkv, source_type="DVD")
     with pytest.raises(InterruptedError):
-        generator = client.start_compress_mkv()
+        generator = client.start_compress_mkv(output_path=output_path)
         next(generator)
         generator.throw(KeyboardInterrupt)
 
@@ -80,6 +78,6 @@ def test_compress_interrupt(tmp_path):
 @pytest.mark.slow
 def test_compress_mkv(tmp_path):
     test_mkv = get_large_test_file()
-    output = tmp_path / "test-small-mkv.mkv"
-    client = FFmpegClient(input_path=test_mkv, output_path=output, source_type="DVD")
-    deque(client.start_compress_mkv(), maxlen=0)
+    output_path = tmp_path / "test-small-mkv.mkv"
+    client = FFmpegClient(input_path=test_mkv, source_type="DVD")
+    deque(client.start_compress_mkv(output_path=output_path), maxlen=0)

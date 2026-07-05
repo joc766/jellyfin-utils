@@ -239,19 +239,12 @@ def compress_mkv_cmd(
     ).execute()
 
     for selected_movie in selected_files:
-        output_path: Path = compressed_storage_base / selected_movie.relative_to(
-            raw_storage_base
-        ).with_suffix(".mp4")
-        output_path.parent.mkdir(exist_ok=True, parents=True)
-        client = FFmpegClient(
-            input_path=selected_movie,
-            output_path=output_path,
-            console=app_ctx.console,
-            source_type=disc_type,
-        )
         try:
             compress_mkv(
-                client,
+                input_path=selected_movie,
+                input_base=raw_storage_base,
+                output_base=compressed_storage_base,
+                source_type=disc_type,
                 overwrite=overwrite,
                 verbose=verbose,
                 single_audio=single_audio,
@@ -259,6 +252,7 @@ def compress_mkv_cmd(
                 height=height,
                 crf=crf,
                 preset=preset,
+                console=app_ctx.console,
                 dry_run=dry_run,
                 silent=silent,
             )

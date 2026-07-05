@@ -143,7 +143,6 @@ class FFmpegClient:
         self,
         *,
         input_path: Path,
-        output_path: Path | None = None,
         console: Console | None = None,
         source_type: str = "DVD",
         executable: str = "ffmpeg",
@@ -151,7 +150,6 @@ class FFmpegClient:
         self.executable = executable
         self.source_type = source_type
         self.input_path = input_path
-        self.output_path = output_path
         self.console = console
 
         if not self.input_path.exists():
@@ -207,6 +205,7 @@ class FFmpegClient:
     # TODO: use ffprobe to figure out if there's an existing stereo track to encode from
     def start_compress_mkv(
         self,
+        output_path: Path,
         overwrite: bool = False,
         deinterlace: bool = False,
         verbose: bool = False,
@@ -221,18 +220,17 @@ class FFmpegClient:
         Starts ffmpeg with the h264 and AAC codecs for the first video stream and first audio stream.
         Re-containerizes to MP4 and ensures consistency across inputs.
         """
-        params_dict = {k: v for k, v in locals().items() if k != "self"}
-        if self.output_path is None:
-            raise FileNotFoundError("Output path cannot be None.")
-        if not self.output_path.parent.exists():
-            raise FileNotFoundError(f"output parent dir {self.output_path.parent} does not exist.")
-        if not overwrite and self.output_path.exists():
-            raise FileExistsError(f"overwrite=False and {self.output_path} already exists.")
+        params_dict = {
+            k: v if not isinstance(v, Path) else str(v) for k, v in locals().items() if k != "self"
+        }
+
+        if not overwrite and output_path.exists():
+            raise FileExistsError(f"overwrite=False and {output_path} already exists.")
 
         compress_command = create_ffmpeg_compress_cmd(
             executable=self.executable,
             input_path=self.input_path,
-            output_path=self.output_path,
+            output_path=output_path,
             source_type=self.source_type,
             overwrite=overwrite,
             deinterlace=deinterlace,

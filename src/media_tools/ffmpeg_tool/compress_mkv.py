@@ -13,6 +13,7 @@ def compress_mkv(
     crf: int | None = None,
     preset: str = "slow",
     dry_run: bool = False,
+    silent: bool = False,
 ):
     video_info = client.probe_video()
     # TODO: use selected audio instead of first
@@ -21,17 +22,23 @@ def compress_mkv(
     field_order = video_info.field_order
     progress = FFmpegProgressTracker()
     deinterlace = field_order != "progressive"
-    with FFmpegProgressRender(client.input_path.stem, duration.seconds) as render:
-        for line in client.start_compress_mkv(
-            overwrite=overwrite,
-            deinterlace=deinterlace,
-            verbose=verbose,
-            single_audio=single_audio,
-            preserve_surround_track=preserve_surround_track,
-            height=height,
-            crf=crf,
-            preset=preset,
-            dry_run=dry_run,
-        ):
-            curr_state = progress.handle_line(line)
-            render.update(curr_state)
+
+    stdout_lines = client.start_compress_mkv(
+        overwrite=overwrite,
+        deinterlace=deinterlace,
+        verbose=verbose,
+        single_audio=single_audio,
+        preserve_surround_track=preserve_surround_track,
+        height=height,
+        crf=crf,
+        preset=preset,
+        dry_run=dry_run,
+    )
+    if silent:
+        for _ in stdout_lines:
+            pass
+    else:
+        with FFmpegProgressRender(client.input_path.stem, duration.seconds) as render:
+            for line in stdout_lines:
+                curr_state = progress.handle_line(line)
+                render.update(curr_state)

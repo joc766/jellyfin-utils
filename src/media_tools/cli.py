@@ -201,6 +201,7 @@ def sample_audios(app_ctx: AppContext, content_type: ContentType):
 @click.option("--crf", "crf", type=int, default=None)
 @click.option("--preset", "preset", type=str, default="slow")
 @click.option("--dry-run", "dry_run", is_flag=True)
+@click.option("--silent", "silent", is_flag=True)
 @click.pass_obj
 def compress_mkv_cmd(
     app_ctx: AppContext,
@@ -214,6 +215,7 @@ def compress_mkv_cmd(
     crf: int | None = None,
     preset: str = "slow",
     dry_run: bool = False,
+    silent: bool = False,
 ):
     compressed_storage_base = app_ctx.config.local_base / "compressed" / content_type
     raw_storage_base = app_ctx.config.local_base / "raw" / content_type
@@ -258,6 +260,7 @@ def compress_mkv_cmd(
                 crf=crf,
                 preset=preset,
                 dry_run=dry_run,
+                silent=silent,
             )
         except AssertionError as e:
             raise e

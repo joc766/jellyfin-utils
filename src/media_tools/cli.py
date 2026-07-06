@@ -136,9 +136,12 @@ def rip_disk_cmd(
     app_ctx: AppContext, content_type: ContentType, verbose: bool = False, debug: bool = False
 ):
     try:
-        output_base = app_ctx.config.local_base / "raw" / content_type
-        client = MakeMKVClient(output_base=output_base, console=app_ctx.console)
-        rip_disk(client, verbose=verbose, debug=debug, console=app_ctx.console)
+        raw_storage_base = app_ctx.config.local_base / "raw" / content_type
+        rip_disk(
+            raw_storage_base=raw_storage_base, verbose=verbose, debug=debug, console=app_ctx.console
+        )
+    except InterruptedError as e:
+        raise click.ClickException(str(e)) from e
     except Exception as e:
         raise e
 
@@ -237,12 +240,11 @@ def compress_mkv_cmd(
         )
     }
 
-    request_id = create_new_request(cli_cmd="compress", cli_params=params_dict)
     compressed_storage_base = app_ctx.config.local_base / "compressed" / content_type
     raw_storage_base = app_ctx.config.local_base / "raw" / content_type
     try:
         selected_folder: Path = ListPrompt(
-            message="Select a raw movie folder:",
+            message=f"Select a raw {content_type} folder:",
             choices=[
                 Choice(value=folder, name=folder.stem)
                 for folder in raw_storage_base.iterdir()
@@ -260,10 +262,10 @@ def compress_mkv_cmd(
             vi_mode=True,
         ).execute()
     except KeyboardInterrupt:
-        complete_request(request_id=request_id, status="interrupted", exit_code=255)
         raise
 
     for selected_movie in selected_files:
+        request_id = create_new_request(cli_cmd="compress", cli_params=params_dict)
         try:
             compress_mkv(
                 input_path=selected_movie,

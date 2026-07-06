@@ -1,7 +1,11 @@
+from pathlib import Path
+
 from InquirerPy.base.control import Choice
 from InquirerPy.prompts.checkbox import CheckboxPrompt
 from InquirerPy.prompts.confirm import ConfirmPrompt
 from rich.console import Console
+
+from media_tools.db.connection import create_new_request
 
 from .client import MakeMKVClient
 from .models import MakeMKVDiscInfo, MakeMKVTitleInfo
@@ -31,14 +35,19 @@ def prompt_for_titles(disc_info: MakeMKVDiscInfo) -> list[MakeMKVTitleInfo]:
 # TODO: add dry run option for easier testing
 # TODO: Handle cleaning file names to proper directory names
 def rip_disk(
-    client: MakeMKVClient,
+    raw_storage_base: Path,
     verbose: bool = False,
     debug: bool = False,
     console: Console | None = None,
 ):
+    params_dict = {
+        k: v if not isinstance(v, Path) else str(v) for k, v in locals().items() if k != "console"
+    }
 
     if console is None:
         console = Console()
+
+    client = MakeMKVClient(output_base=raw_storage_base, console=console)
 
     progress_tracker = MakeMKVProgressTracker(verbose=verbose)
     with MakeMKVProgressRenderer(console=console) as renderer:
@@ -64,6 +73,7 @@ def rip_disk(
         progress_tracker.update_status("Running [repr.filename]makemkvcon mkv[/repr.filename]")
         renderer.resume()
         for i, title in enumerate(titles_to_rip):
+            request_id = create_new_request(cli_cmd="rip", cli_params=params_dict)
             # check if file already exists
             curr_file = client.output_path / title.title_name
             if curr_file.exists():
@@ -83,6 +93,8 @@ def rip_disk(
             progress_tracker.update_status(
                 f"Ripping {title.title_name} [dim][{i + 1}/{len(titles_to_rip)}][/dim]"
             )
-            for line in client.run_makemkv(title_id=title.title_id, debug=debug):
+            for line in client.run_makemkv(
+                title_id=title.title_id, debug=debug, request_id=request_id
+            ):
                 curr_state = progress_tracker.handle_line(line)
                 renderer.update(curr_state)

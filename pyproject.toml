@@ -50,5 +50,8 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-m 'not slow'"
-markers = ["slow: tests that are long-running and therefore optional"]
+addopts = "-m 'not slow and not integration'"
+markers = [
+    "slow: tests that are long-running and therefore optional",
+    "integration: tests that involve external API communication",
+]

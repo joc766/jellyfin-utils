@@ -1,4 +1,7 @@
+import os
 from pathlib import Path
+
+import pytest
 
 from media_tools.cli import load_config
 from media_tools.omdb_tool import (
@@ -9,8 +12,11 @@ from media_tools.omdb_tool import (
 )
 
 
+@pytest.mark.integration
 def test_omdb_client():
-    api_key = load_config().omdb_api_key
+    api_key = os.environ.get("OMDB_API_KEY")
+    if api_key is None:
+        raise ValueError("Must set environment variable for OMDB_API_KEY")
     client = OmdbClient(api_key)
     imdb_id = "tt1375666"
     omdb_title, omdb_year = client.get_title(imdb_id)
@@ -22,8 +28,11 @@ def test_omdb_client():
     assert full_title == "Inception (2010) [imdbid-tt1375666]"
 
 
+@pytest.mark.integration
 def test_organize_movie(tmp_path: Path):
-    api_key = load_config().omdb_api_key
+    api_key = os.environ.get("OMDB_API_KEY")
+    if api_key is None:
+        raise ValueError("Must set environment variable for OMDB_API_KEY")
     client = OmdbClient(api_key)
     imdb_id = "tt1375666"
     omdb_title, omdb_year = client.get_title(imdb_id)
@@ -45,8 +54,11 @@ def test_organize_movie(tmp_path: Path):
     assert result_file_path.exists()
 
 
+@pytest.mark.integration
 def test_organize_tv(tmp_path: Path):
-    api_key = load_config().omdb_api_key
+    api_key = os.environ.get("OMDB_API_KEY")
+    if api_key is None:
+        raise ValueError("Must set environment variable for OMDB_API_KEY")
     client = OmdbClient(api_key)
     imdb_id = "tt3032476"
     omdb_title, omdb_year = client.get_title(imdb_id)

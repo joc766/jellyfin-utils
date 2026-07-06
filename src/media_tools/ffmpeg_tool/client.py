@@ -3,6 +3,8 @@ import os
 import shlex
 import signal
 import subprocess
+import threading
+from collections import deque
 from pathlib import Path
 
 from rich.console import Console
@@ -13,6 +15,14 @@ from media_tools.ffmpeg_tool.models import (
     FFProbeAudioStreamInfo,
     FFProbeVideoStreamInfo,
 )
+
+
+def drain_stderr(stderr, log_path: Path, last_lines: deque[str]) -> None:
+    with log_path.open("a", encoding="utf-8") as log_file:
+        for line in stderr:
+            log_file.write(line)
+            log_file.flush()
+            last_lines.append(line)
 
 
 def create_ffmpeg_compress_cmd(
@@ -267,6 +277,14 @@ class FFmpegClient:
                     ffmpeg_proc.send_signal(signal.SIGTERM)
                     raise e
 
+            last_stderr_lines: deque[str] = deque(maxlen=50)
+            stderr_thread = threading.Thread(
+                target=drain_stderr,
+                args=(ffmpeg_proc.stderr, Path("ffmpeg.log"), last_stderr_lines),
+                daemon=True,
+            )
+            stderr_thread.start()
+
             interrupted = False
             closed = False
             try:
@@ -288,6 +306,8 @@ class FFmpegClient:
                 except subprocess.TimeoutExpired:
                     ffmpeg_proc.terminate()
                     res = ffmpeg_proc.wait()
+
+                stderr_thread.join(timeout=5)
 
                 if request_id is not None:
                     if res == 0:

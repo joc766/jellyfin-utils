@@ -8,7 +8,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.text import Text
 
-from media_tools.db.connection import complete_request, create_new_request
+from media_tools.db.connection import complete_request, update_pids
 from media_tools.ffmpeg_tool.models import (
     FFProbeAudioStreamInfo,
     FFProbeVideoStreamInfo,
@@ -206,6 +206,7 @@ class FFmpegClient:
     def start_compress_mkv(
         self,
         output_path: Path,
+        request_id: int | None = None,
         overwrite: bool = False,
         deinterlace: bool = False,
         verbose: bool = False,
@@ -220,10 +221,6 @@ class FFmpegClient:
         Starts ffmpeg with the h264 and AAC codecs for the first video stream and first audio stream.
         Re-containerizes to MP4 and ensures consistency across inputs.
         """
-        params_dict = {
-            k: v if not isinstance(v, Path) else str(v) for k, v in locals().items() if k != "self"
-        }
-
         if not overwrite and output_path.exists():
             raise FileExistsError(f"overwrite=False and {output_path} already exists.")
 
@@ -257,30 +254,50 @@ class FFmpegClient:
             assert ffmpeg_proc.stdout is not None
             assert ffmpeg_proc.stderr is not None
 
-            try:
-                # log to db
-                request_id = create_new_request(
-                    cli_cmd="compress",
-                    cli_params=params_dict,
-                    exc_cmd=compress_command_str,
-                    pid=ffmpeg_proc.pid,
-                    parent_pid=os.getpid(),
-                )
-            except Exception as e:
-                ffmpeg_proc.send_signal(signal.SIGTERM)
-                raise e
+            if request_id is not None:
+                try:
+                    # log to db
+                    update_pids(
+                        request_id=request_id,
+                        exc_cmd=compress_command_str,
+                        pid=ffmpeg_proc.pid,
+                        parent_pid=os.getpid(),
+                    )
+                except Exception as e:
+                    ffmpeg_proc.send_signal(signal.SIGTERM)
+                    raise e
 
             interrupted = False
+            closed = False
             try:
                 yield from ffmpeg_proc.stdout
+
             except KeyboardInterrupt as e:
                 ffmpeg_proc.send_signal(signal.SIGINT)
                 interrupted = True
                 raise InterruptedError("FFmpeg Aborted!") from e
+
+            except GeneratorExit:
+                ffmpeg_proc.send_signal(signal.SIGINT)
+                closed = True
+                raise
+
             finally:
-                res = ffmpeg_proc.wait()
-                if res != 0 and not interrupted:
-                    complete_request(request_id, res, ffmpeg_proc.stderr.read(1000))
+                try:
+                    res = ffmpeg_proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    ffmpeg_proc.terminate()
+                    res = ffmpeg_proc.wait()
+
+                if request_id is not None:
+                    if res == 0:
+                        complete_request(request_id, "completed", res)
+                    elif interrupted or closed:
+                        err_excerpt = "".join(last_stderr_lines)
+                        complete_request(request_id, "interrupted", res, err_excerpt)
+                    else:
+                        err_excerpt = "".join(last_stderr_lines)
+                        complete_request(request_id, "failed", res, err_excerpt)
+
+                if res != 0 and not interrupted and not closed:
                     raise RuntimeError(f"ffmpeg failed with exit code {res}")
-                else:
-                    complete_request(request_id, res)

@@ -15,6 +15,7 @@ from rich.table import Table
 from rich.text import Text
 
 from media_tools.config import AppContext, load_config
+from media_tools.db.connection import complete_request, create_new_request
 from media_tools.ffmpeg_tool.client import FFmpegClient
 from media_tools.ffmpeg_tool.compress_mkv import compress_mkv
 from media_tools.makemkv_tool import MakeMKVClient, rip_disk
@@ -217,26 +218,50 @@ def compress_mkv_cmd(
     dry_run: bool = False,
     silent: bool = False,
 ):
+    params_dict = {
+        k: v
+        for k, v in locals().items()
+        if k
+        in (
+            "disc_type",
+            "content_type",
+            "overwrite",
+            "verbose",
+            "single_audio",
+            "preserve_surround",
+            "height",
+            "crf",
+            "preset",
+            "dry_run",
+            "silent",
+        )
+    }
+
+    request_id = create_new_request(cli_cmd="compress", cli_params=params_dict)
     compressed_storage_base = app_ctx.config.local_base / "compressed" / content_type
     raw_storage_base = app_ctx.config.local_base / "raw" / content_type
-    selected_folder: Path = ListPrompt(
-        message="Select a raw movie folder:",
-        choices=[
-            Choice(value=folder, name=folder.stem)
-            for folder in raw_storage_base.iterdir()
-            if folder.is_dir()
-        ],
-        vi_mode=True,
-    ).execute()
-    selected_files = CheckboxPrompt(
-        message="Select a title to compress:",
-        choices=[
-            Choice(value=file, name=str(file.relative_to(selected_folder)))
-            for file in sorted(selected_folder.rglob("*"), key=lambda k: k.name)
-            if file.is_file() and file.suffix in (".mkv", "mp4", ".mov")
-        ],
-        vi_mode=True,
-    ).execute()
+    try:
+        selected_folder: Path = ListPrompt(
+            message="Select a raw movie folder:",
+            choices=[
+                Choice(value=folder, name=folder.stem)
+                for folder in raw_storage_base.iterdir()
+                if folder.is_dir()
+            ],
+            vi_mode=True,
+        ).execute()
+        selected_files = CheckboxPrompt(
+            message="Select a title to compress:",
+            choices=[
+                Choice(value=file, name=str(file.relative_to(selected_folder)))
+                for file in sorted(selected_folder.rglob("*"), key=lambda k: k.name)
+                if file.is_file() and file.suffix in (".mkv", "mp4", ".mov")
+            ],
+            vi_mode=True,
+        ).execute()
+    except KeyboardInterrupt:
+        complete_request(request_id=request_id, status="interrupted", exit_code=255)
+        raise
 
     for selected_movie in selected_files:
         try:
@@ -245,6 +270,7 @@ def compress_mkv_cmd(
                 input_base=raw_storage_base,
                 output_base=compressed_storage_base,
                 source_type=disc_type,
+                request_id=request_id,
                 overwrite=overwrite,
                 verbose=verbose,
                 single_audio=single_audio,
@@ -511,6 +537,8 @@ def download_from_server(
                                 render.update(curr_state)
                     else:
                         client.sync_file(rel_file_path=title_path, debug=debug, dry_run=dry_run)
+    except InterruptedError as e:
+        raise click.ClickException(str(e)) from e
 
     except AssertionError as e:
         raise e

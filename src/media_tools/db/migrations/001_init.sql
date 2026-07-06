@@ -3,12 +3,13 @@ CREATE TABLE IF NOT EXISTS request (
 
     cli_cmd TEXT NOT NULL,
     cli_params TEXT CHECK (json_valid(cli_params)),
-    exc_cmd TEXT NOT NULL,
+    exc_cmd TEXT,
     pid INTEGER,
     parent_pid INTEGER,
     start_time TEXT,
     end_time TEXT,
     duration REAL,
+    status TEXT,
 
     exit_code INTEGER,
     err_msg TEXT

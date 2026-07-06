@@ -12,6 +12,7 @@ def compress_mkv(
     input_path: Path,
     input_base: Path,
     source_type: str,
+    request_id: int | None = None,
     overwrite: bool = False,
     verbose: bool = False,
     single_audio: bool = False,
@@ -40,6 +41,7 @@ def compress_mkv(
 
     stdout_lines = client.start_compress_mkv(
         output_path=output_path,
+        request_id=request_id,
         overwrite=overwrite,
         deinterlace=deinterlace,
         verbose=verbose,

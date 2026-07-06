@@ -35,8 +35,6 @@ class MakeMKVProgressTracker:
             event = self.parse_line(line)
             if event is not None:
                 self.apply_progress(event)
-        elif self.PROG_TASK_COMPLETE_PATTERN.match(line):
-            self.complete_all()
         return self.state
 
     def update_status(self, status: str):
@@ -73,10 +71,10 @@ class MakeMKVProgressTracker:
     def apply_progress(self, event: ProgEvent):
         match event:
             case ProgTotalEvent():
-                self.state.prog_total = 0
+                self.state.prog_total = None
                 self.state.total_task_name = event.name
             case ProgCurrEvent():
-                self.state.prog_curr = 0
+                self.state.prog_curr = None
                 self.state.curr_task_name = event.name
             case ProgValueEvent():
                 # update total progress

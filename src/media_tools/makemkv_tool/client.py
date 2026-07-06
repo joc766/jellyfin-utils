@@ -2,6 +2,8 @@ import os
 import shlex
 import signal
 import subprocess
+import threading
+from collections import deque
 from pathlib import Path
 
 from rich.console import Console
@@ -10,6 +12,14 @@ from rich.text import Text
 from media_tools.db.connection import complete_request, update_pids
 
 from .info_parser import MakeMKVInfoParser
+
+
+def drain_stderr(stderr, log_path: Path, last_lines: deque[str]) -> None:
+    with log_path.open("a", encoding="utf-8") as log_file:
+        for line in stderr:
+            log_file.write(line)
+            log_file.flush()
+            last_lines.append(line)
 
 
 # TODO: verify/add support for non-disk drives to allow testing with backed-up data
@@ -122,7 +132,7 @@ class MakeMKVClient:
             title,
             str(self.output_path),
             "--progress=-stdout",
-            "--messages=-same",
+            "--messages=-stderr",
         ]
 
         mkv_command_str = shlex.join(mkv_command)
@@ -133,12 +143,13 @@ class MakeMKVClient:
         mkv_proc = subprocess.Popen(
             mkv_command,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
         )
 
         assert mkv_proc.stdout is not None
+        assert mkv_proc.stderr is not None
 
         if request_id is not None:
             try:
@@ -153,6 +164,13 @@ class MakeMKVClient:
             except Exception as e:
                 mkv_proc.send_signal(signal.SIGTERM)
                 raise e
+
+        last_stderr_lines: deque[str] = deque(maxlen=50)
+        log_path = Path("makemkv.log")
+        stderr_thread = threading.Thread(
+            target=drain_stderr, args=(mkv_proc.stderr, log_path, last_stderr_lines), daemon=True
+        )
+        stderr_thread.start()
 
         interrupted = False
         closed = False
@@ -176,14 +194,17 @@ class MakeMKVClient:
                 mkv_proc.terminate()
                 res = mkv_proc.wait()
 
-            # TODO: makemkvcon does not output anything to stderr, so there will be no informative error messages. However, robust logging MSG details will likely fix this issue
+            stderr_thread.join(timeout=5)
+
             if request_id is not None:
                 if res == 0:
                     complete_request(request_id, "completed", res)
                 elif interrupted or closed:
-                    complete_request(request_id, "interrupted", res)
+                    err_excerpt = "".join(last_stderr_lines)
+                    complete_request(request_id, "interrupted", res, err_excerpt)
                 else:
-                    complete_request(request_id, "failed", res)
+                    err_excerpt = "".join(last_stderr_lines)
+                    complete_request(request_id, "failed", res, err_excerpt)
 
             if res != 0 and not interrupted:
                 raise RuntimeError(f"makemkvcon failed with exit code {res}")

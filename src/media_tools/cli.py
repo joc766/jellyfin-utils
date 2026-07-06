@@ -15,10 +15,10 @@ from rich.table import Table
 from rich.text import Text
 
 from media_tools.config import AppContext, load_config
-from media_tools.db.connection import complete_request, create_new_request
+from media_tools.db.connection import create_new_request
 from media_tools.ffmpeg_tool.client import FFmpegClient
 from media_tools.ffmpeg_tool.compress_mkv import compress_mkv
-from media_tools.makemkv_tool import MakeMKVClient, rip_disk
+from media_tools.makemkv_tool import rip_disk
 from media_tools.omdb_tool import (
     MovieTitleOptions,
     OmdbClient,

@@ -177,34 +177,33 @@ class MakeMKVClient:
         try:
             yield from mkv_proc.stdout
 
-        except KeyboardInterrupt as e:
-            mkv_proc.send_signal(signal.SIGINT)
+        # TODO: insepct this code for optimization
+        except (KeyboardInterrupt, GeneratorExit) as e:
+            mkv_proc.terminate()
             interrupted = True
             raise InterruptedError("MakeMKV aborted!") from e
 
-        except GeneratorExit:
-            mkv_proc.send_signal(signal.SIGINT)
-            closed = True
-            raise
-
         finally:
+            res = None
             try:
                 res = mkv_proc.wait(10)
             except subprocess.TimeoutExpired:
+                self.console.print("Timeout Expired, terminating...")
                 mkv_proc.terminate()
                 res = mkv_proc.wait()
+            finally:
+                assert res is not None
+                stderr_thread.join(timeout=5)
 
-            stderr_thread.join(timeout=5)
+                if request_id is not None:
+                    if res == 0:
+                        complete_request(request_id, "completed", res)
+                    elif interrupted or closed:
+                        err_excerpt = "".join(last_stderr_lines)
+                        complete_request(request_id, "interrupted", res, err_excerpt)
+                    else:
+                        err_excerpt = "".join(last_stderr_lines)
+                        complete_request(request_id, "failed", res, err_excerpt)
 
-            if request_id is not None:
-                if res == 0:
-                    complete_request(request_id, "completed", res)
-                elif interrupted or closed:
-                    err_excerpt = "".join(last_stderr_lines)
-                    complete_request(request_id, "interrupted", res, err_excerpt)
-                else:
-                    err_excerpt = "".join(last_stderr_lines)
-                    complete_request(request_id, "failed", res, err_excerpt)
-
-            if res != 0 and not interrupted:
-                raise RuntimeError(f"makemkvcon failed with exit code {res}")
+                if res != 0 and not interrupted:
+                    raise RuntimeError(f"makemkvcon failed with exit code {res}")

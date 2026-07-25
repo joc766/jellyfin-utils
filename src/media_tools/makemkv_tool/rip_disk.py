@@ -33,6 +33,7 @@ def prompt_for_titles(disc_info: MakeMKVDiscInfo) -> list[MakeMKVTitleInfo]:
 
 
 # TODO: add dry run option for easier testing
+# TODO: handle missing drive cleanly
 # TODO: Handle cleaning file names to proper directory names
 def rip_disk(
     raw_storage_base: Path,

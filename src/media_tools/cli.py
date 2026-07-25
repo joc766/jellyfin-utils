@@ -33,8 +33,6 @@ from media_tools.rsync_tool.progress import RsyncProgressTracker
 from media_tools.rsync_tool.render import RsyncRender
 from media_tools.sftp_tool import JellyfinSFTPClient, get_imdb_id
 
-# TODO: add commands to suppress progress tracking
-# TODO: log files
 # TODO: move functions to separate module and just add them as commands
 
 
@@ -415,6 +413,8 @@ def upload_to_server(
 
     except AssertionError as e:
         raise e
+    except InterruptedError as e:
+        raise click.ClickException(str(e)) from e
     except Exception as e:
         raise e
 
@@ -599,7 +599,7 @@ def safe_removal(app_ctx: AppContext, content_format: ContentFormat, content_typ
     deletable_folders = [v for k, v in all_folder_info.items() if k in deletable_ids]
     if len(deletable_folders) > 0:
         selected = CheckboxPrompt(
-            message=f"Select which titles you would like to remove from {app_ctx.config.local_base}",
+            message=f"Select which titles you would like to remove from {local_path}",
             choices=[
                 Choice(value=folder_path, name=folder_path.stem)
                 for folder_path in deletable_folders

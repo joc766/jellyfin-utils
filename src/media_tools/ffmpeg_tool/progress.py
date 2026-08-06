@@ -1,6 +1,7 @@
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from decimal import Decimal
 
 from rich.console import Console
 from rich.progress import (
@@ -26,7 +27,7 @@ class SpeedColumn(ProgressColumn):
     """Renders the upload speed from FFmpeg"""
 
     def render(self, task: Task) -> Text:
-        speed = task.fields.get("speed", 0.0)
+        speed = task.fields.get("speed", "0.00")
         return Text(f"{speed}", style="green")
 
 
@@ -89,14 +90,26 @@ class FFmpegProgressRender:
             )
 
 
+def format_sig_digits(value: str, digits: int = 3) -> str:
+    d = Decimal(value)
+
+    if d == 0:
+        return "0." + "0" * (digits - 1)
+
+    adjusted = d.adjusted()
+    places = digits - adjusted - 1
+
+    return f"{d:.{max(places, 0)}f}"
+
+
 class FFmpegProgressTracker:
     out_time_pattern = re.compile("^out_time_us=(\\d+)$")
-    speed_pattern = re.compile("^speed=(\\d+\\.\\d+x)$")
+    speed_pattern = re.compile("^speed=(\\d+\\.\\d+)x$")
 
     def __init__(self):
         self.started = False
         self.stopped = False
-        self.state = FFmpegProgressState(out_time=0, out_time_seconds=0, speed="")
+        self.state = FFmpegProgressState(out_time=0, out_time_seconds=0, speed="0.00")
 
     def track_progress(self, proc: Iterable[str], verbose: bool = False):
         for line in proc:
@@ -113,7 +126,7 @@ class FFmpegProgressTracker:
             self.state.out_time = out_time
             self.state.out_time_seconds = out_time_seconds
         elif speed_match := self.speed_pattern.match(line):
-            speed = speed_match.group(1)
+            speed = f"{format_sig_digits(speed_match.group(1))}x"
             self.state.speed = speed
 
         return self.state

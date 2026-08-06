@@ -53,11 +53,14 @@ def compress_mkv(
         preset=preset,
         dry_run=dry_run,
     )
-    if silent:
-        for _ in stdout_lines:
-            pass
-    else:
-        with FFmpegProgressRender(client.input_path.stem, duration.seconds) as render:
-            for line in stdout_lines:
-                curr_state = progress.handle_line(line)
-                render.update(curr_state)
+    try:
+        if silent:
+            for _ in stdout_lines:
+                pass
+        else:
+            with FFmpegProgressRender(client.input_path.stem, duration.seconds) as render:
+                for line in stdout_lines:
+                    curr_state = progress.handle_line(line)
+                    render.update(curr_state)
+    finally:
+        stdout_lines.close()

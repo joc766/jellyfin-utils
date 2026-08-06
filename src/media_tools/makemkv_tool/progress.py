@@ -8,7 +8,6 @@ class MakeMKVProgressTracker:
     PROG_TOTAL_PATTERN = re.compile('^PRGT:(\\d+),(\\d+),"([^"]+)"$')
     PROG_CURR_PATTERN = re.compile('^PRGC:(\\d+),(\\d+),"([^"]+)"$')
     PROG_VALUE_PATTERN = re.compile("^PRGV:(\\d+),(\\d+),(\\d+)$")
-    PROG_TASK_COMPLETE_PATTERN = re.compile("^MSG:5011")
 
     # init method for when a stdout can be passed directly
     def __init__(self, verbose: bool = False) -> None:

@@ -18,6 +18,7 @@ from media_tools.config import AppContext, load_config
 from media_tools.db.connection import create_new_request
 from media_tools.ffmpeg_tool.client import FFmpegClient
 from media_tools.ffmpeg_tool.compress_mkv import compress_mkv
+from media_tools.ffmpeg_tool.utils import probe_audios
 from media_tools.makemkv_tool import rip_disk
 from media_tools.omdb_tool import (
     MovieTitleOptions,
@@ -173,7 +174,7 @@ def sample_audios(app_ctx: AppContext, content_type: ContentType):
     table.add_column("stream_index")
     table.add_column("codec_name")
     table.add_column("channels")
-    audios = client.probe_audios()
+    audios = probe_audios(client.input_path)
     for audio_info in audios:
         table.add_row(str(audio_info.index), audio_info.codec_name, str(audio_info.channels))
     app_ctx.console.print(table)

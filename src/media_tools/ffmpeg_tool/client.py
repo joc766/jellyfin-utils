@@ -1,4 +1,3 @@
-import json
 import os
 import shlex
 import signal
@@ -11,10 +10,7 @@ from rich.console import Console
 from rich.text import Text
 
 from media_tools.db.connection import complete_request, update_pids
-from media_tools.ffmpeg_tool.models import (
-    FFProbeAudioStreamInfo,
-    FFProbeVideoStreamInfo,
-)
+from media_tools.ffmpeg_tool.crop_detect import crop_detect
 
 
 def drain_stderr(stderr, log_path: Path, last_lines: deque[str]) -> None:
@@ -100,16 +96,16 @@ def create_ffmpeg_compress_cmd(
     setsar_filter = None
     setfield_filter = "setfield=prog" if deinterlace else None
     deinterlace_filter = "yadif" if deinterlace else None
+    crop_filter = crop_detect(input_path)
 
     if source_type == "DVD":
         setsar_filter = "setsar=1"
-        height = 480
         # no reason to go lower than 480p, height parameter does not apply
-        scale_filter = f"scale=round({height}*dar/2)*2:{height}:flags=lanczos"
+        scale_filter = "scale=round(iw*sar/2)*2:ih:flags=lanczos"
 
     video_filters = [
         f
-        for f in (deinterlace_filter, scale_filter, setsar_filter, setfield_filter)
+        for f in (deinterlace_filter, scale_filter, setsar_filter, setfield_filter, crop_filter)
         if f is not None
     ]
 
@@ -164,46 +160,6 @@ class FFmpegClient:
 
         if not self.input_path.exists():
             raise FileNotFoundError(f"input_path {input_path} does not exist.")
-
-    def probe_video(self) -> FFProbeVideoStreamInfo:
-        command = [
-            "ffprobe",
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_streams",
-            "-show_entries",
-            "stream=index,codec_name,codec_type,start_pts,start_time,profile,width,height,pix_fmt,level,field_order,sample_aspect_ratio,display_aspect_ratio:stream_disposition=default,original:stream_tags=language,title,DURATION-eng,NUMBER_OF_BYTES-eng,BPS-eng",
-            "-of",
-            "json",
-            str(self.input_path),
-        ]
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-        data = json.loads(result.stdout)
-        stream_info = FFProbeVideoStreamInfo.model_validate(data["streams"][0])
-        return stream_info
-
-    def probe_audios(self) -> list[FFProbeAudioStreamInfo]:
-        command = [
-            "ffprobe",
-            "-v",
-            "error",
-            "-select_streams",
-            "a:m:language:eng",
-            "-show_streams",
-            "-show_entries",
-            "stream=index,codec_name,codec_type,sample_rate,channels,channel_layout,start_pts,start_time,bit_rate:stream_disposition=default,original",
-            "-of",
-            "json",
-            str(self.input_path),
-        ]
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-
-        data = json.loads(result.stdout)
-        all_stream_info = [FFProbeAudioStreamInfo.model_validate(x) for x in data["streams"]]
-
-        return all_stream_info
 
     def play_audio(self, index: int) -> None:
         play_cmd = ["ffplay", "-ss", "00:05:00", "-vn", "-ast", str(index), str(self.input_path)]

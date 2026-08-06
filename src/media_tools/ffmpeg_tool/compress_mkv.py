@@ -4,6 +4,7 @@ from rich.console import Console
 
 from media_tools.ffmpeg_tool.client import FFmpegClient
 from media_tools.ffmpeg_tool.progress import FFmpegProgressRender, FFmpegProgressTracker
+from media_tools.ffmpeg_tool.utils import probe_audios, probe_video
 
 
 # TODO: add dry-run parameter for easier testing and planning
@@ -25,9 +26,9 @@ def compress_mkv(
     console: Console | None = None,
 ):
     client = FFmpegClient(input_path=input_path, console=console, source_type=source_type)
-    video_info = client.probe_video()
+    video_info = probe_video(input_path)
     # TODO: use selected audio instead of first
-    audio_info = client.probe_audios()[0]
+    audio_info = probe_audios(input_path)[0]
     duration = max(video_info.tags.duration_eng, audio_info.tags.duration_eng)
     field_order = video_info.field_order
     progress = FFmpegProgressTracker()

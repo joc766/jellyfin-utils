@@ -200,6 +200,7 @@ def sample_audios(app_ctx: AppContext, content_type: ContentType):
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--single-audio", "single_audio", is_flag=True)
 @click.option("--preserve-surround", "preserve_surround", is_flag=True)
+@click.option("--detect-crop", "detect_crop", is_flag=True)
 @click.option("--height", "height", type=int, default=None)
 @click.option("--crf", "crf", type=int, default=None)
 @click.option("--preset", "preset", type=str, default="slow")
@@ -213,6 +214,7 @@ def compress_mkv_cmd(
     overwrite: bool,
     verbose: bool = False,
     preserve_surround: bool = False,
+    detect_crop: bool = False,
     single_audio: bool = False,
     height: int | None = None,
     crf: int | None = None,
@@ -276,6 +278,7 @@ def compress_mkv_cmd(
                 verbose=verbose,
                 single_audio=single_audio,
                 preserve_surround_track=preserve_surround,
+                detect_crop=detect_crop,
                 height=height,
                 crf=crf,
                 preset=preset,

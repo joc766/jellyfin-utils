@@ -23,6 +23,7 @@ def compress_mkv(
     preset: str = "slow",
     dry_run: bool = False,
     silent: bool = False,
+    detect_crop: bool = False,
     console: Console | None = None,
 ):
     client = FFmpegClient(input_path=input_path, console=console, source_type=source_type)
@@ -52,6 +53,7 @@ def compress_mkv(
         crf=crf,
         preset=preset,
         dry_run=dry_run,
+        detect_crop=detect_crop,
     )
     try:
         if silent:

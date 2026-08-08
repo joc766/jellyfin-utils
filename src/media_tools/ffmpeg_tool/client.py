@@ -33,6 +33,7 @@ def create_ffmpeg_compress_cmd(
     crf: int | None = None,
     preset: str = "slow",
     preserve_surround_track: bool = False,
+    detect_crop: bool = False,
 ):
     compress_command = [executable]
     compress_command.extend(["-v", "error"])
@@ -96,7 +97,7 @@ def create_ffmpeg_compress_cmd(
     setsar_filter = None
     setfield_filter = "setfield=prog" if deinterlace else None
     deinterlace_filter = "yadif" if deinterlace else None
-    crop_filter = crop_detect(input_path)
+    crop_filter = crop_detect(input_path) if detect_crop else None
 
     if source_type == "DVD":
         setsar_filter = "setsar=1"
@@ -182,6 +183,7 @@ class FFmpegClient:
         crf: int | None = None,
         preset: str = "slow",
         preserve_surround_track: bool = False,
+        detect_crop: bool = False,
     ):
         """
         Starts ffmpeg with the h264 and AAC codecs for the first video stream and first audio stream.
@@ -202,6 +204,7 @@ class FFmpegClient:
             crf=crf,
             preset=preset,
             preserve_surround_track=preserve_surround_track,
+            detect_crop=detect_crop,
         )
         compress_command_str = shlex.join(compress_command)
 

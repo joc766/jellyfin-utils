@@ -35,6 +35,7 @@ from media_tools.rsync_tool.render import RsyncRender
 from media_tools.sftp_tool import JellyfinSFTPClient, get_imdb_id
 
 # TODO: move functions to separate module and just add them as commands
+# TODO: make cli interactive vs. fully requiring every parameter
 
 
 class AllowedValuesValidator(Validator):
@@ -64,6 +65,7 @@ def cli(ctx: click.Context, env_file: Path | None = None):
     ctx.obj = AppContext(config=config, console=Console())
 
 
+# TODO: edge case: when title name is the same, movie got deleted??
 @cli.command("organize")
 @click.option("--movie", "content_type", flag_value="movie", default=True)
 @click.option("--tv", "content_type", flag_value="tv")
@@ -294,6 +296,9 @@ def compress_mkv_cmd(
             raise e
 
 
+# TODO: fix rsync progress when there's an existing
+# - Idea: use --include to explicitly list the selected files, that way we get better progress
+#   - Option: just sync the individual files instead of the whole folder, unless the whole folder is new
 @cli.command("upload")
 @click.option("--movie", "content_type", flag_value="movie", default=True, type=str)
 @click.option("--tv", "content_type", flag_value="tv", type=str)
@@ -423,6 +428,7 @@ def upload_to_server(
         raise e
 
 
+# TODO: handle network connectivity errors cleanly
 @cli.command("download")
 @click.option("--movie", "content_type", flag_value="movie", default=True, type=str)
 @click.option("--tv", "content_type", flag_value="tv", type=str)
@@ -576,6 +582,8 @@ def find_missing_compressed(app_ctx: AppContext):
     console.print(missing_table)
 
 
+# TODO: remove .DS_Store files too
+# TODO: also show option to remove episodes, not just high-level folder
 @cli.command("safe-remove")
 @click.option("--raw", "content_format", flag_value="raw", type=str, default=True)
 @click.option("--compressed", "content_format", flag_value="compressed", type=str)

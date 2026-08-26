@@ -7,6 +7,9 @@ from .progress import RsyncProgressTracker
 from .render import RsyncRender
 
 
+# TODO: download should allow some more interesting filters using the jellyfin database (optionally)
+# i.e. unplayed, etc.
+# TODO: additionally, a search bar would be nice
 def sync_with_server(
     client: RsyncClient,
     title_name: str,
@@ -20,6 +23,10 @@ def sync_with_server(
             render.update(curr_state)
 
 
+# TODO: move RsyncClient out of cli.py and into this file
+# TODO: use socket to check network reachability if RsyncLocation.server is not None
+# TODO: use db and log file tracking
+# TODO: handle directories that don't yet exist on the server side (maybe use SFTPClient?)
 def interactive_sync(client: RsyncClient, verbose: bool = False, debug: bool = False) -> None:
     if verbose:
         client.console.print(f"src: {client.src.render()}\ndest: {client.dest.render()}")

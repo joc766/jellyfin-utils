@@ -12,6 +12,7 @@ def test_info_intterupt(tmp_path):
         generator.throw(KeyboardInterrupt)
 
 
+# TODO: need a test of interrupt!
 # def test_mkv_intterupt(tmp_path):
 #     # TODO: mock client.disc_info
 #     client = MakeMKVClient(output_base=tmp_path, console=Console())

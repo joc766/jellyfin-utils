@@ -10,24 +10,24 @@ readme = "README.md"
 requires-python = ">= 3.10"
 authors = [{ name = "Jack O'Connor", email = "coders-alcoves.7x@icloud.com" }]
 dependencies = [
-    "rich>=15.0.0",
-    "python-dotenv>=1.2.2",
-    "click>8.3.3",
-    "inquirerpy>=0.3.4",
-    "requests>=2.34.0",
-    "paramiko>=5.0.0",
-    "pydantic>=2.13.4",
+  "rich>=15.0.0",
+  "python-dotenv>=1.2.2",
+  "click>8.3.3",
+  "inquirerpy>=0.3.4",
+  "requests>=2.34.0",
+  "paramiko>=5.0.0",
+  "pydantic>=2.13.4",
 ]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "boto3", "sqlfluff"]
+dev = ["pytest", "boto3", "sqlfluff", "ipython", "botocore"]
 
 [project.scripts]
-media-tools = "media_tools.cli:main"
+media-tools = "media_tools.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -52,6 +52,6 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-m 'not slow and not integration'"
 markers = [
-    "slow: tests that are long-running and therefore optional",
-    "integration: tests that involve external API communication",
+  "slow: tests that are long-running and therefore optional",
+  "integration: tests that involve external API communication",
 ]

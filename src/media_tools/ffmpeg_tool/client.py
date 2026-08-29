@@ -11,6 +11,7 @@ from rich.text import Text
 
 from media_tools.db.connection import complete_request, update_pids
 from media_tools.ffmpeg_tool.crop_detect import crop_detect
+from media_tools.ffmpeg_tool.models import Libx264Tune
 
 
 def drain_stderr(stderr, log_path: Path, last_lines: deque[str]) -> None:
@@ -32,6 +33,7 @@ def create_ffmpeg_compress_cmd(
     height: int | None = None,
     crf: int | None = None,
     preset: str = "slow",
+    tune: Libx264Tune = None,
     preserve_surround_track: bool = False,
     detect_crop: bool = False,
 ):
@@ -91,6 +93,9 @@ def create_ffmpeg_compress_cmd(
             "4.1",
         ]
     )
+
+    if tune is not None:
+        compress_command.extend(["-tune", tune])
 
     # VIDEO FILTERS
     scale_filter = f"scale=-2:{height}:flags=lanczos" if height is not None else None
@@ -182,6 +187,7 @@ class FFmpegClient:
         height: int | None = None,
         crf: int | None = None,
         preset: str = "slow",
+        tune: Libx264Tune = None,
         preserve_surround_track: bool = False,
         detect_crop: bool = False,
     ):
@@ -203,6 +209,7 @@ class FFmpegClient:
             height=height,
             crf=crf,
             preset=preset,
+            tune=tune,
             preserve_surround_track=preserve_surround_track,
             detect_crop=detect_crop,
         )

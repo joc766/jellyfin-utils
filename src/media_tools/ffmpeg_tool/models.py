@@ -1,6 +1,10 @@
 from datetime import timedelta
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
+
+# TODO: this is just a type hint, it doesn't actually enforce anything. need something better than a literal
+Libx264Tune = Literal["film", "animation", "grain", None]
 
 
 class FFProbeDispositionInfo(BaseModel):

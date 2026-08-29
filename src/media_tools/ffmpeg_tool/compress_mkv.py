@@ -3,11 +3,13 @@ from pathlib import Path
 from rich.console import Console
 
 from media_tools.ffmpeg_tool.client import FFmpegClient
+from media_tools.ffmpeg_tool.models import Libx264Tune
 from media_tools.ffmpeg_tool.progress import FFmpegProgressRender, FFmpegProgressTracker
 from media_tools.ffmpeg_tool.utils import probe_audios, probe_video
 
 
-# TODO: add dry-run parameter for easier testing and planning
+# TODO: don't log to db when doing a dry run
+# TODO: use more literals like Libx264Tune
 def compress_mkv(
     output_base: Path,
     input_path: Path,
@@ -21,6 +23,7 @@ def compress_mkv(
     height: int | None = None,
     crf: int | None = None,
     preset: str = "slow",
+    tune: Libx264Tune = None,
     dry_run: bool = False,
     silent: bool = False,
     detect_crop: bool = False,
@@ -52,6 +55,7 @@ def compress_mkv(
         height=height,
         crf=crf,
         preset=preset,
+        tune=tune,
         dry_run=dry_run,
         detect_crop=detect_crop,
     )

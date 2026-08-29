@@ -14,7 +14,25 @@ class JellyfinSFTPClient:
     def __init__(self, jellyfin_host: str, jellyfin_user: str, jellyfin_base: Path):
         self.ssh_client = paramiko.SSHClient()
         self.ssh_client.load_system_host_keys()
-        self.ssh_client.connect(jellyfin_host, username=jellyfin_user)
+        config_path = Path("~/.ssh/config").expanduser()
+
+        # parse info from ssh config file if relevant
+        ssh_config = paramiko.SSHConfig()
+        if config_path.exists():
+            with config_path.open() as f:
+                ssh_config.parse(f)
+
+        user_config_info = ssh_config.lookup(jellyfin_host)
+
+        hostname = user_config_info.get("hostname", jellyfin_host)
+
+        key_path = None
+        if "identityfile" in user_config_info:
+            key_path = Path(user_config_info["identityfile"][0]).expanduser()
+            if not key_path.exists():
+                key_path = None
+
+        self.ssh_client.connect(hostname, username=jellyfin_user, key_filename=str(key_path))
         self.sftp_client = self.ssh_client.open_sftp()
         self.jellyfin_base = jellyfin_base
 

@@ -174,8 +174,7 @@ class RsyncClient:
                     src_root.path / rel_file_path, host=src_root.host, user=src_root.user
                 )
                 dest = RsyncLocation(dest.path / rel_file_path.parent, dest.host, dest.user)
-                if self.direction == "download":
-                    dest.path.mkdir(parents=True, exist_ok=True)
+                dest.mkdir()
         else:
             src = RsyncLocation(src_root.path / subdir, host=src_root.host, user=src_root.user)
 
@@ -265,8 +264,32 @@ class RsyncClient:
         return rsync_cmd
 
     def get_new_files(self, debug: bool = False) -> dict[str, dict[str, RsyncChangeInfo]]:
-        """Get the list of files in local_base not in jellyfin_base using sync(dry_run=True)"""
-        content_to_sync = defaultdict(dict[str, RsyncChangeInfo])
+        """
+        Get the list of files in local_base not in jellyfin_base using sync(dry_run=True)
+
+        Example:
+        ```
+            // app_ctx.jellyfin_base = '/mnt/storage/mymedia'
+            // app_ctx.jellyfin_host = 'someserver'
+            // app_ctx.jellyfin_user = 'root'
+            // app_ctx.local_base = Path('/Volumes/SomeDrive/jellyfin')
+            client = RsyncClient.from_config(app_ctx.config, console=app_ctx.console, direction='upload', content_format='raw', content_type='tv')
+            new_files = client.get_new_files()
+
+            print(new_files)
+            // output: {
+                'The White Lotus (2021–) [imdbid-tt13406094]': {
+                    'Season 03/The White Lotus S03E01.mkv': description: New, size: 2.08 GB,
+                    'Season 03/The White Lotus S03E02.mkv': description: New, size: 2.09 GB,
+                    'Season 03/The White Lotus S03E03.mkv': description: New, size: 2.05 GB,
+                    'Season 03/The White Lotus S03E04.mkv': description: New, size: 2.07 GB,
+                    'Season 03/The White Lotus S03E05.mkv': description: New, size: 2.11 GB,
+                    'Season 03/The White Lotus S03E06.mkv': description: New, size: 2.17 GB}
+                }
+            }
+
+
+        """
         new_files = defaultdict(dict[str, RsyncChangeInfo])
         for line in self.sync(dry_run=True, debug=debug):
             if (

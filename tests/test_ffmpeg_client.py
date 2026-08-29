@@ -8,6 +8,7 @@ from botocore import UNSIGNED
 from botocore.config import Config
 
 from media_tools.ffmpeg_tool.client import FFmpegClient
+from media_tools.ffmpeg_tool.utils import probe_video
 
 
 def get_large_test_file():

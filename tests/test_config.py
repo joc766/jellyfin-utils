@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from media_tools import load_config
+from media_tools.cli.config import load_config
 
 
 def test_missing_config_file(tmp_path: Path):

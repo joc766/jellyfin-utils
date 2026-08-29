@@ -35,17 +35,17 @@ def upload(
     dry_run: bool,
     silent: bool,
 ):
-    client = RsyncClient.from_config(
-        app_ctx.config,
-        console=app_ctx.console,
-        direction="upload",
-        content_format=content_format,
-        content_type=content_type,
-    )
     try:
+        client = RsyncClient.from_config(
+            app_ctx.config,
+            console=app_ctx.console,
+            direction="upload",
+            content_format=content_format,
+            content_type=content_type,
+        )
         if verbose:
             client.console.print(f"src: {client.src.render()}\ndest: {client.dest.render()}")
-        content_to_sync = client.get_new_files(debug=debug)
+        new_files = client.get_new_files(debug=debug)
         # TODO: make table transient
         table = Table(
             title=f"{client.content_format.capitalize()} {client.content_type.capitalize()}s found in src not on server",
@@ -57,7 +57,7 @@ def upload(
         table.add_column("file_size", style="purple")
 
         table_data = []
-        for movie_title, file_info in content_to_sync.items():
+        for movie_title, file_info in new_files.items():
             for file_name, changes in file_info.items():
                 table_data.append([movie_title, file_name, changes.description, changes.size])
 
@@ -79,7 +79,7 @@ def upload(
             case "movie":
                 selected = CheckboxPrompt(
                     message="Select titles to sync",
-                    choices=list(content_to_sync.keys()),
+                    choices=list(new_files.keys()),
                     instruction="Use space to select, enter to confirm.",
                     vi_mode=True,
                 ).execute()
@@ -104,11 +104,11 @@ def upload(
             case "tv":
                 selected_show = ListPrompt(
                     message="Select show to sync:",
-                    choices=list(content_to_sync.keys()),
+                    choices=list(new_files.keys()),
                     instruction="Use space to select, enter to confirm",
                     vi_mode=True,
                 ).execute()
-                show_info = content_to_sync[selected_show]
+                show_info = new_files[selected_show]
                 selected_episodes = CheckboxPrompt(
                     message="Select episodes to sync:",
                     choices=list(show_info.keys()),
@@ -139,7 +139,7 @@ def upload(
 
     except AssertionError as e:
         raise e
-    except InterruptedError as e:
+    except (InterruptedError, ConnectionError) as e:
         raise click.ClickException(str(e)) from e
     except Exception as e:
         raise e
@@ -165,17 +165,17 @@ def download(
     dry_run: bool = False,
     silent: bool = False,
 ):
-    client = RsyncClient.from_config(
-        app_ctx.config,
-        console=app_ctx.console,
-        direction="download",
-        content_format=content_format,
-        content_type=content_type,
-    )
     try:
+        client = RsyncClient.from_config(
+            app_ctx.config,
+            console=app_ctx.console,
+            direction="download",
+            content_format=content_format,
+            content_type=content_type,
+        )
         if verbose:
             client.console.print(f"src: {client.src.render()}\ndest: {client.dest.render()}")
-        content_to_sync = client.get_new_files(debug=debug)
+        new_files = client.get_new_files(debug=debug)
         # TODO: make table transient
         table = Table(
             title=f"{client.content_format.capitalize()} {client.content_type.capitalize()}s found in src not on server",
@@ -187,7 +187,7 @@ def download(
         table.add_column("file_size", style="purple")
 
         table_data = []
-        for movie_title, file_info in content_to_sync.items():
+        for movie_title, file_info in new_files.items():
             for file_name, changes in file_info.items():
                 table_data.append([movie_title, file_name, changes.description, changes.size])
 
@@ -209,7 +209,7 @@ def download(
             case "movie":
                 selected = CheckboxPrompt(
                     message="Select movies to sync:",
-                    choices=list(content_to_sync.keys()),
+                    choices=list(new_files.keys()),
                     instruction="Use space to select, enter to confirm.",
                     vi_mode=True,
                 ).execute()
@@ -234,11 +234,11 @@ def download(
             case "tv":
                 selected_show = ListPrompt(
                     message="Select show to sync:",
-                    choices=list(content_to_sync.keys()),
+                    choices=list(new_files.keys()),
                     instruction="Use space to select, enter to confirm",
                     vi_mode=True,
                 ).execute()
-                show_info = content_to_sync[selected_show]
+                show_info = new_files[selected_show]
                 selected_episodes = CheckboxPrompt(
                     message="Select episodes to sync:",
                     choices=list(show_info.keys()),

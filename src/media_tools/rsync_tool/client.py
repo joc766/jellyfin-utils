@@ -2,6 +2,7 @@ import codecs
 import re
 import shlex
 import signal
+import socket
 import subprocess
 from collections import defaultdict
 from collections.abc import Generator
@@ -19,6 +20,17 @@ from .models import (
     RsyncSources,
     TransferDirection,
 )
+
+
+def check_connection(remote_host: str) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(3)
+        try:
+            s.connect_ex((remote_host, 22))
+        except (TimeoutError, ConnectionRefusedError, OSError):
+            return False
+
+        return True
 
 
 # fix stupid bullshit not uploading new season folder
@@ -42,8 +54,8 @@ class RsyncClient:
         self,
         *,
         jellyfin_base: Path,
-        jellyfin_host: str | None,
-        jellyfin_user: str | None,
+        jellyfin_host: str,
+        jellyfin_user: str,
         local_base: Path,
         console: Console,
         direction: TransferDirection,
@@ -51,13 +63,16 @@ class RsyncClient:
         content_type: ContentType,
         executable: str = "rsync",
     ):
+        if not check_connection(jellyfin_host):
+            raise ConnectionError(f"jellyfin host {jellyfin_host} is unreachable.")
+
         self.executable = executable
         self.direction: TransferDirection = direction
         self.content_format: ContentFormat = content_format
         self.content_type: ContentType = content_type
         self.console: Console = console
         self.jellyfin_base: Path = jellyfin_base
-        self.jellyfin_host: str | None = jellyfin_host
+        self.jellyfin_host: str = jellyfin_host
         self.jellyfin_user: str | None = jellyfin_user
         self.local_base: Path = local_base
         self.rsync_proc = None
@@ -252,6 +267,7 @@ class RsyncClient:
     def get_new_files(self, debug: bool = False) -> dict[str, dict[str, RsyncChangeInfo]]:
         """Get the list of files in local_base not in jellyfin_base using sync(dry_run=True)"""
         content_to_sync = defaultdict(dict[str, RsyncChangeInfo])
+        new_files = defaultdict(dict[str, RsyncChangeInfo])
         for line in self.sync(dry_run=True, debug=debug):
             if (
                 not self.INTRO_MSG_PATTERN.match(line)
@@ -286,9 +302,9 @@ class RsyncClient:
                                 if x != "."
                             )
                         )
-                        content_to_sync[movie_title][filename] = change_info
+                        new_files[movie_title][filename] = change_info
 
-        return content_to_sync
+        return new_files
 
     def format_bytes(self, size_in_bytes: float):
         """Converts a byte count into a human-readable string format."""

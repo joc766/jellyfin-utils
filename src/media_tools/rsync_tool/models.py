@@ -7,6 +7,9 @@ class RsyncChangeInfo:
     description: str
     size: str
 
+    def __repr__(self) -> str:
+        return f"description: {self.description}, size: {self.size}"
+
 
 @dataclass
 class RsyncLocation:

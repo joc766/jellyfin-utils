@@ -6,6 +6,10 @@ from pydantic import BaseModel, Field, field_validator
 # TODO: this is just a type hint, it doesn't actually enforce anything. need something better than a literal
 Libx264Tune = Literal["film", "animation", "grain", None]
 
+Libx264Preset = Literal[
+    "veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast", "superfast", "ultrafast"
+]
+
 
 class FFProbeDispositionInfo(BaseModel):
     default: bool = False

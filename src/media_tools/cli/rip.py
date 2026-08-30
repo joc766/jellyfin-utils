@@ -1,8 +1,8 @@
 import click
 
 from media_tools.cli.config import AppContext
+from media_tools.core.datatypes import ContentType
 from media_tools.makemkv_tool.rip_disk import rip_disk
-from media_tools.rsync_tool.models import ContentType
 
 
 @click.command()

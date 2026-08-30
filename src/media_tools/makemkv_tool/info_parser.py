@@ -35,9 +35,9 @@ class MakeMKVInfoBuilder:
         match event.key:
             case "disc_type":
                 if event.value == "DVD disc":
-                    disc_type = "DVD"
+                    disc_type = "dvd"
                 else:
-                    disc_type = "BD"
+                    disc_type = "bd"
                 self.disc_info.disc_type = disc_type
             case "disc_title":
                 self.disc_info.disc_title = re.sub(r"[-./]", "", event.value)

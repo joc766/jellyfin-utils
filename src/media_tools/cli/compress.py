@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import get_args
 
 import click
 from InquirerPy.base.control import Choice
@@ -6,16 +7,15 @@ from InquirerPy.prompts.checkbox import CheckboxPrompt
 from InquirerPy.prompts.list import ListPrompt
 
 from media_tools.cli.config import AppContext
+from media_tools.core.datatypes import ContentType, DiscType
 from media_tools.db.connection import create_new_request
 from media_tools.ffmpeg_tool.compress_mkv import compress_mkv
-from media_tools.ffmpeg_tool.models import Libx264Tune
+from media_tools.ffmpeg_tool.models import Libx264Preset, Libx264Tune
 
 
 @click.command("compress")
-@click.option("--dvd", "-d", "disc_type", flag_value="DVD", default=True)
-@click.option("--bd", "-b", "disc_type", flag_value="BD")
-@click.option("--movie", "content_type", flag_value="movie", default=True)
-@click.option("--tv", "content_type", flag_value="tv")
+@click.argument("content_type", type=click.Choice(get_args(ContentType)), default="movie")
+@click.argument("disc_type", type=click.Choice(get_args(DiscType)), default="dvd")
 @click.option("--overwrite", "-f", "overwrite", is_flag=True)
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--single-audio", "single_audio", is_flag=True)
@@ -23,15 +23,15 @@ from media_tools.ffmpeg_tool.models import Libx264Tune
 @click.option("--detect-crop", "detect_crop", is_flag=True)
 @click.option("--height", "height", type=int, default=None)
 @click.option("--crf", "crf", type=int, default=None)
-@click.option("--preset", "preset", type=str, default="slow")
-@click.option("--tune", "tune", type=str, default=None)
+@click.option("--preset", "preset", type=click.Choice(get_args(Libx264Preset)), default="slow")
+@click.option("--tune", "tune", type=click.Choice(get_args(Libx264Tune)), default=None)
 @click.option("--dry-run", "dry_run", is_flag=True)
 @click.option("--silent", "silent", is_flag=True)
 @click.pass_obj
 def compress_mkv_cmd(
     app_ctx: AppContext,
-    disc_type: str,
-    content_type: str,
+    disc_type: DiscType,
+    content_type: ContentType,
     overwrite: bool,
     verbose: bool = False,
     preserve_surround: bool = False,
@@ -39,7 +39,7 @@ def compress_mkv_cmd(
     single_audio: bool = False,
     height: int | None = None,
     crf: int | None = None,
-    preset: str = "slow",
+    preset: Libx264Preset = "slow",
     tune: Libx264Tune = None,
     dry_run: bool = False,
     silent: bool = False,

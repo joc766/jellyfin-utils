@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Literal
 
-DiscType = Literal["BD", "DVD"]
+from media_tools.core.datatypes import DiscType
 
 
 @dataclass

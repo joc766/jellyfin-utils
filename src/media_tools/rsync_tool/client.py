@@ -12,9 +12,9 @@ from typing import IO
 from rich.console import Console
 from rich.text import Text
 
+from media_tools.core.datatypes import ContentFormat, ContentType
+
 from .models import (
-    ContentFormat,
-    ContentType,
     RsyncChangeInfo,
     RsyncLocation,
     RsyncSources,
@@ -35,6 +35,7 @@ def check_connection(remote_host: str) -> bool:
 
 # fix stupid bullshit not uploading new season folder
 # TODO: Handle rsync < 3.0.0. Only issue: --info=progress2 does not exist, so can just print raw output most likely
+# TODO: Need to flag when user is not using rsync > 3.0.0
 class RsyncClient:
     INTRO_MSG_PATTERN = re.compile(r"^sending incremental file list$")
     SENT_MSG_PATTERN = re.compile(r"^sent .* bytes  received .* bytes .* bytes/sec$")
@@ -54,8 +55,8 @@ class RsyncClient:
         self,
         *,
         jellyfin_base: Path,
-        jellyfin_host: str,
-        jellyfin_user: str,
+        jellyfin_host: str | None = None,
+        jellyfin_user: str | None = None,
         local_base: Path,
         console: Console,
         direction: TransferDirection,
@@ -63,8 +64,9 @@ class RsyncClient:
         content_type: ContentType,
         executable: str = "rsync",
     ):
-        if not check_connection(jellyfin_host):
-            raise ConnectionError(f"jellyfin host {jellyfin_host} is unreachable.")
+        if jellyfin_host is not None:
+            if not check_connection(jellyfin_host):
+                raise ConnectionError(f"jellyfin host {jellyfin_host} is unreachable.")
 
         self.executable = executable
         self.direction: TransferDirection = direction
@@ -72,7 +74,7 @@ class RsyncClient:
         self.content_type: ContentType = content_type
         self.console: Console = console
         self.jellyfin_base: Path = jellyfin_base
-        self.jellyfin_host: str = jellyfin_host
+        self.jellyfin_host: str | None = jellyfin_host
         self.jellyfin_user: str | None = jellyfin_user
         self.local_base: Path = local_base
         self.rsync_proc = None
@@ -152,6 +154,10 @@ class RsyncClient:
                 self.console.print(chunk)
             yield chunk
 
+    # TODO: download should allow some more interesting filters using the jellyfin database (optionally)
+    # i.e. unplayed, etc.
+    # TODO: additionally, a search bar would be nice
+    # TODO: use db and log file tracking
     def _sync(
         self,
         subdir: str | None = None,

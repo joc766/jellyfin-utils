@@ -11,7 +11,7 @@ from rich.text import Text
 
 from media_tools.db.connection import complete_request, update_pids
 from media_tools.ffmpeg_tool.crop_detect import crop_detect
-from media_tools.ffmpeg_tool.models import Libx264Tune
+from media_tools.ffmpeg_tool.models import Libx264Preset, Libx264Tune
 
 
 def drain_stderr(stderr, log_path: Path, last_lines: deque[str]) -> None:
@@ -174,7 +174,6 @@ class FFmpegClient:
         except KeyboardInterrupt:
             pass
 
-    # TODO: use ffprobe to figure out if there's an existing stereo track to encode from
     def start_compress_mkv(
         self,
         output_path: Path,
@@ -186,7 +185,7 @@ class FFmpegClient:
         single_audio: bool = False,
         height: int | None = None,
         crf: int | None = None,
-        preset: str = "slow",
+        preset: Libx264Preset = "slow",
         tune: Libx264Tune = None,
         preserve_surround_track: bool = False,
         detect_crop: bool = False,

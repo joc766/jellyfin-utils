@@ -62,5 +62,3 @@ class RsyncSources(NamedTuple):
 
 
 TransferDirection = Literal["upload", "download"]
-ContentFormat = Literal["raw", "compressed"]
-ContentType = Literal["movie", "tv"]

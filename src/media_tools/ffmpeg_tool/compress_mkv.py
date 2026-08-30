@@ -3,7 +3,7 @@ from pathlib import Path
 from rich.console import Console
 
 from media_tools.ffmpeg_tool.client import FFmpegClient
-from media_tools.ffmpeg_tool.models import Libx264Tune
+from media_tools.ffmpeg_tool.models import Libx264Preset, Libx264Tune
 from media_tools.ffmpeg_tool.progress import FFmpegProgressRender, FFmpegProgressTracker
 from media_tools.ffmpeg_tool.utils import probe_audios, probe_video
 
@@ -22,7 +22,7 @@ def compress_mkv(
     preserve_surround_track: bool = False,
     height: int | None = None,
     crf: int | None = None,
-    preset: str = "slow",
+    preset: Libx264Preset = "slow",
     tune: Libx264Tune = None,
     dry_run: bool = False,
     silent: bool = False,

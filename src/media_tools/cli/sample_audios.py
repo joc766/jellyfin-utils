@@ -9,9 +9,9 @@ from prompt_toolkit.validation import ValidationError, Validator
 from rich.table import Table
 
 from media_tools.cli.config import AppContext
+from media_tools.core.datatypes import ContentType
 from media_tools.ffmpeg_tool.client import FFmpegClient
 from media_tools.ffmpeg_tool.utils import probe_audios
-from media_tools.rsync_tool.models import ContentType
 
 
 class AllowedValuesValidator(Validator):

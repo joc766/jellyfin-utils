@@ -28,7 +28,7 @@ def test_info_parser_total():
 
     disc_info: MakeMKVDiscInfo = MakeMKVInfoParser().parse(lines)
     assert disc_info.disc_title == "INCEPTION"
-    assert disc_info.disc_type == "DVD"
+    assert disc_info.disc_type == "dvd"
     assert len(disc_info.titles.keys()) == 2
     assert len(disc_info.titles[0].streams.keys()) == 6
     assert len(disc_info.titles[1].streams.keys()) == 4

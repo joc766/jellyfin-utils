@@ -6,8 +6,8 @@ from InquirerPy.prompts.checkbox import CheckboxPrompt
 from rich.table import Table
 
 from media_tools.cli.config import AppContext
+from media_tools.core.datatypes import ContentFormat, ContentType
 from media_tools.rsync_tool.client import RsyncClient
-from media_tools.rsync_tool.models import ContentFormat, ContentType
 from media_tools.sftp_tool.client import JellyfinSFTPClient, get_imdb_id
 
 
